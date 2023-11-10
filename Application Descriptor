@@ -1,7 +1,12 @@
-MIDlet-Vendor: nnproject
 MIDlet-Version: 1.0.0
+MIDlet-Vendor: nnproject
+MIDlet-Icon: /icon.png
+Nokia-MIDlet-UID-1: 0xA789C6D2
 MicroEdition-Configuration: CLDC-1.1
-MIDlet-1: MahoRasp,,MahoRaspApp2
-MIDlet-Name: MahoRasp2
+Nokia-MIDlet-Category: Application
+MIDlet-Name: MahoRasp
+MIDlet-1: MahoRasp,/icon.png,MahoRaspApp2
 MicroEdition-Profile: MIDP-2.0
-MIDlet-Jar-URL: MahoRasp2.jar
+MIDlet-Jar-URL: MahoRasp.jar
+Nokia-Scalable-Icon: /icon.svg
+Nokia-Scalable-Icon-MIDlet-1: /icon.svg
