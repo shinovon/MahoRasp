@@ -28,7 +28,7 @@ import java.util.Vector;
  * JSON Library by nnproject.cc<br>
  * Usage:<p><code>JSONObject obj = JSON.getObject(str);</code>
  * @author Shinovon
- * @version 1.4
+ * @version 1.5
  */
 public final class JSON {
 
@@ -60,16 +60,17 @@ public final class JSON {
 		return (JSONArray) parseJSON(string);
 	}
 
-	static Object getJSON(Object obj) throws JSONException {
+	static Object getJSON(Object obj) {
 		if (obj instanceof Hashtable) {
 			return new JSONObject((Hashtable) obj);
-		} else if (obj instanceof Vector) {
-			return new JSONArray((Vector) obj);
-		} else if (obj == null) {
-			return json_null;
-		} else {
-			return obj;
 		}
+		if (obj instanceof Vector) {
+			return new JSONArray((Vector) obj);
+		}
+		if (obj == null) {
+			return json_null;
+		}
+		return obj;
 	}
 
 	static Object parseJSON(String str) throws JSONException {
@@ -300,6 +301,7 @@ public final class JSON {
 	}
 
 	public static double getDouble(Object o) throws JSONException {
+		if(isNull(o)) throw new JSONException("Null to number cast");
 		try {
 			if (o instanceof Integer)
 				return ((Integer) o).intValue();
@@ -313,6 +315,7 @@ public final class JSON {
 	}
 
 	public static long getLong(Object o) throws JSONException {
+		if(isNull(o)) throw new JSONException("Null to number cast");
 		try {
 			if (o instanceof Integer)
 				return ((Integer) o).longValue();

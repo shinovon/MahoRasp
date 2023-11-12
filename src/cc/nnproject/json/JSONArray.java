@@ -179,11 +179,11 @@ public class JSONArray extends AbstractJSON {
 	}
 	
 	public boolean isNull(int index) {
-		return JSON.isNull(getNullable(index));
+		return JSON.isNull(get(index));
 	}
 	
 	public void add(String s) {
-		vector.addElement(s);
+		vector.addElement(JSON.getJSON(s));
 	}
 
 	public void add(boolean b) {
@@ -207,7 +207,7 @@ public class JSONArray extends AbstractJSON {
 	}
 	
 	public void set(int idx, String s) {
-		vector.setElementAt(s, idx);
+		vector.setElementAt(JSON.getJSON(s), idx);
 	}
 
 	public void set(int idx, boolean b) {
@@ -231,7 +231,7 @@ public class JSONArray extends AbstractJSON {
 	}
 	
 	public void put(int idx, String s) {
-		vector.insertElementAt(s, idx);
+		vector.insertElementAt(JSON.getJSON(s), idx);
 	}
 
 	public void put(int idx, boolean b) {

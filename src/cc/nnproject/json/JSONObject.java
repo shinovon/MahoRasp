@@ -47,7 +47,7 @@ public class JSONObject extends AbstractJSON {
 				Object o = table.get(name);
 				if (o instanceof JSONString)
 					table.put(name, o = JSON.parseJSON(o.toString()));
-				else if (o == JSON.json_null)
+				if (JSON.isNull(o))
 					return null;
 				return o;
 			}
@@ -198,11 +198,11 @@ public class JSONObject extends AbstractJSON {
 	}
 	
 	public boolean isNull(String name) {
-		return JSON.isNull(getNullable(name));
+		return JSON.isNull(get(name));
 	}
 
 	public void put(String name, String s) {
-		table.put(name, s);
+		table.put(name, JSON.getJSON(s));
 	}
 
 	public void put(String name, boolean b) {
