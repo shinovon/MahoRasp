@@ -54,6 +54,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private TextField fromField;
 	private TextField toField;
 	private StringItem submitBtn;
+//	private ChoiceGroup showTransfers;
 
 	private Image planeImg;
 	private Image trainImg;
@@ -82,6 +83,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		mainForm.append(fromField);
 		toField = new TextField("to", "c163", 10, TextField.ANY);
 		mainForm.append(toField);
+//		showTransfers = new ChoiceGroup("", Choice.EXCLUSIVE, new String[] { "Показывать пересадки" }, null);
+//		mainForm.append(showTransfers);
 		submitBtn = new StringItem(null, "Искать", StringItem.BUTTON);
 //		submitBtn.setLayout(Item.LAYOUT_EXPAND | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_NEWLINE_BEFORE);
 		submitBtn.addCommand(submitCmd);
@@ -141,10 +144,15 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				Calendar cal = Calendar.getInstance();
 				cal.setTime(dateField.getDate());
 				searchDate = cal.get(Calendar.YEAR) + "-" + (cal.get(Calendar.MONTH) + 1) + "-" + cal.get(Calendar.DAY_OF_MONTH);
-				resultForm.append(searchDate + "\n");
 				searchParams = "from=" + fromField.getString() + "&to=" + toField.getString();
 				int transport = transportChoice.getSelectedIndex();
 				result = api("search/?date=" + searchDate + "&" + searchParams + "&transfers=true" + (transport > 0 ? ("&transport_types=" + TRANSPORT_TYPES[transport]) : ""));
+				
+				JSONObject search = result.getObject("search");
+				StringItem titleItem = new StringItem(searchDate, search.getObject("from").getString("title") + " - " + search.getObject("to").getString("title") + "\n");
+				titleItem.setLayout(Item.LAYOUT_CENTER);
+				resultForm.append(titleItem);
+				
 				JSONArray segments = result.getArray("segments");
 				for(Enumeration e = segments.elements(); e.hasMoreElements();) {
 					JSONObject seg = (JSONObject) e.nextElement();
@@ -168,6 +176,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 					r += (oneDay(cal, departure) ? time(departure) : shortDate(departure) + " " + time(departure));
 					r += " - " + (oneDay(cal, arrival) ? time(arrival) : shortDate(arrival) + " " + time(arrival)) + "\n";
 					StringItem s = new StringItem("", r + "\n");
+					s.setLayout(Item.LAYOUT_LEFT);
 					resultForm.append(s);
 				}
 			} catch (Exception e) {
