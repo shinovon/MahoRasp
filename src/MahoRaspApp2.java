@@ -155,6 +155,10 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				titleItem.setLayout(Item.LAYOUT_CENTER);
 				resultForm.append(titleItem);
 				
+				StringItem left = new StringItem(null, "");
+				left.setLayout(Item.LAYOUT_LEFT);
+				resultForm.append(left);
+				
 				JSONArray segments = result.getArray("segments");
 				for(Enumeration e = segments.elements(); e.hasMoreElements();) {
 					JSONObject seg = (JSONObject) e.nextElement();
