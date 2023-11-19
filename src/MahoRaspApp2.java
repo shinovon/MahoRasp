@@ -3,7 +3,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.Enumeration;
+import java.util.Hashtable;
 import java.util.Vector;
 
 import javax.microedition.io.Connector;
@@ -71,8 +71,11 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private String searchParams;
 
 	private JSONObject result;
+	private Hashtable items;
+	private int selectedItem;
 
 	public MahoRaspApp2() {
+		items = new Hashtable();
 		midlet = this;
 		mainForm = new Form("MahoRasp");
 		mainForm.addCommand(exitCmd);
@@ -118,6 +121,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	public void commandAction(Command c, Item i) {
 		if(c == itemCmd) {
 			display(loadingAlert("Загрузка"));
+			selectedItem = ((Integer) items.get(i)).intValue();
 			run(2);
 			return;
 		}
@@ -145,6 +149,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		running = true;
 		switch(run) {
 		case 1: {
+			items.clear();
 			resultForm = new Form("Результат поиска");
 			resultForm.addCommand(backCmd);
 			resultForm.setCommandListener(this);
@@ -196,6 +201,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 					s.setDefaultCommand(itemCmd);
 					s.setItemCommandListener(this);
 					s.setLayout(Item.LAYOUT_LEFT);
+					items.put(s, new Integer(i));
 					resultForm.append(s);
 				}
 			} catch (Exception e) {
@@ -209,7 +215,11 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			Form f = new Form("");
 			f.addCommand(backCmd);
 			f.setCommandListener(this);
-			// TODO
+			//TODO
+			JSONObject j = result.getArray("segments").getObject(selectedItem);
+			
+			f.append(j.format());
+			
 			display(f);
 		}
 		}
