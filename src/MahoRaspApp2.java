@@ -34,6 +34,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static final Command exitCmd = new Command("Выход", Command.EXIT, 1);
 	private static final Command backCmd = new Command("Назад", Command.BACK, 1);
 	private static final Command submitCmd = new Command("Искать", Command.ITEM, 2);
+	
+	private static final String APIKEY = "20e7cb3e-6b05-4774-bcbb-4b0fb74a58b0";
 
 	private static final String[] TRANSPORT_NAMES = new String[] {
 		"Любой", "Самолет", "Поезд", "Электричка", "Автобус",
@@ -420,7 +422,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	}
 	
 	static JSONObject api(String url) throws Exception {
-		String r = getUtf("http://api.rasp.yandex.net/v3.0/" + url + (!url.endsWith("?") ? "&" : "") + "apikey=20e7cb3e-6b05-4774-bcbb-4b0fb74a58b0&format=json&lang=ru_RU");
+		String r = getUtf("http://api.rasp.yandex.net/v3.0/" + url + (!url.endsWith("?") ? "&" : "") + "apikey=" + APIKEY + "&format=json&lang=ru_RU");
 		JSONObject j = JSON.getObject(r);
 		if(j.has("error")) {
 			// выбрасывать эксепшн с текстом ошибки
