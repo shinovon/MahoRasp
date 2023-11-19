@@ -34,6 +34,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static final Command exitCmd = new Command("Выход", Command.EXIT, 1);
 	private static final Command backCmd = new Command("Назад", Command.BACK, 1);
 	private static final Command submitCmd = new Command("Искать", Command.ITEM, 2);
+	private static final Command itemCmd = new Command("Подробнее", Command.ITEM, 2);
 	
 	private static final String APIKEY = "20e7cb3e-6b05-4774-bcbb-4b0fb74a58b0";
 
@@ -115,6 +116,11 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	}
 
 	public void commandAction(Command c, Item i) {
+		if(c == itemCmd) {
+			display(loadingAlert("Загрузка"));
+			run(2);
+			return;
+		}
 		commandAction(c, mainForm);
 	}
 
@@ -156,17 +162,21 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				resultForm.append(titleItem);
 				
 				StringItem left = new StringItem(null, "");
-				left.setLayout(Item.LAYOUT_LEFT);
+				left.setLayout(Item.LAYOUT_LEFT | Item.LAYOUT_NEWLINE_BEFORE);
 				resultForm.append(left);
 				
 				JSONArray segments = result.getArray("segments");
-				for(Enumeration e = segments.elements(); e.hasMoreElements();) {
-					JSONObject seg = (JSONObject) e.nextElement();
+				int size = segments.size();
+				if(size == 0) {
+					left.setText("Пусто!");
+				}
+				for(int i = 0; i < size; i++) {
+					JSONObject seg = segments.getObject(i);
 					String r = "";
 					if(seg.getBoolean("has_transfers")) {
 						JSONArray types = seg.getArray("transport_types");
-						for(int i = 0; i < types.size(); i++) {
-							resultForm.append(transportImg(types.getString(i)));
+						for(int j = 0; j < types.size(); j++) {
+							resultForm.append(transportImg(types.getString(j)));
 						}
 						JSONObject from = seg.getObject("departure_from");
 						JSONObject to = seg.getObject("arrival_to");
@@ -182,6 +192,9 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 					r += (oneDay(cal, departure) ? time(departure) : shortDate(departure) + " " + time(departure));
 					r += " - " + (oneDay(cal, arrival) ? time(arrival) : shortDate(arrival) + " " + time(arrival)) + "\n";
 					StringItem s = new StringItem("", r + "\n");
+					s.addCommand(itemCmd);
+					s.setDefaultCommand(itemCmd);
+					s.setItemCommandListener(this);
 					s.setLayout(Item.LAYOUT_LEFT);
 					resultForm.append(s);
 				}
@@ -191,6 +204,13 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			}
 			display(resultForm);
 			break;
+		}
+		case 2: {
+			Form f = new Form("");
+			f.addCommand(backCmd);
+			f.setCommandListener(this);
+			// TODO
+			display(f);
 		}
 		}
 		running = false;
