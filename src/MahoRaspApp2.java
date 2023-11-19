@@ -154,7 +154,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				searchDate = cal.get(Calendar.YEAR) + "-" + (cal.get(Calendar.MONTH) + 1) + "-" + cal.get(Calendar.DAY_OF_MONTH);
 				searchParams = "from=" + fromField.getString() + "&to=" + toField.getString();
 				int transport = transportChoice.getSelectedIndex();
-				result = api("search/?date=" + searchDate + "&" + searchParams + "&transfers=true" + (transport > 0 ? ("&transport_types=" + TRANSPORT_TYPES[transport]) : ""));
+				result = api("search/?date=" + searchDate + "&" + searchParams + "&transfers=true" + (transport > 0 ? ("&transport_types=" + TRANSPORT_TYPES[transport - 1]) : ""));
 				
 				JSONObject search = result.getObject("search");
 				StringItem titleItem = new StringItem(searchDate, search.getObject("from").getString("title") + " - " + search.getObject("to").getString("title") + "\n");
