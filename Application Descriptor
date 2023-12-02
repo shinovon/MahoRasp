@@ -3,7 +3,6 @@ MIDlet-Vendor: nnproject
 MIDlet-Icon: /icon.png
 Nokia-MIDlet-UID-1: 0xA789C6D2
 MicroEdition-Configuration: CLDC-1.1
-Nokia-MIDlet-Category: Application
 MIDlet-Name: MahoRasp
 MIDlet-1: MahoRasp,/icon.png,MahoRaspApp2
 MicroEdition-Profile: MIDP-2.0
