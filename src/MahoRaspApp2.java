@@ -456,7 +456,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			Form f = new Form("");
 			f.addCommand(backCmd);
 			f.setCommandListener(this);
-			// TODO interval_segments, tickets_info, stops, departure_platform, departure_terminal
+			// TODO departure_platform, departure_terminal
 			JSONObject seg = result.getArray("segments").getObject(selectedItem);
 			
 			if(seg.getBoolean("has_transfers")) {
@@ -523,17 +523,48 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 						);
 				s.setFont(Font.getFont(0, 0, Font.SIZE_SMALL));
 				f.append(s);
-
+				String s1 = seg.getNullableString("stops");
+				if(s1 != null && s1.length() > 0) {
+					s = new StringItem(null, "Остановки: " + s1 + "\n\n");
+					s.setFont(Font.getFont(0, 0, Font.SIZE_SMALL));
+					f.append(s);
+				}
+				if(seg.has("tickets_info")) {
+					String r = "Цена:\n";
+					JSONArray places = seg.getObject("tickets_info").getArray("places");
+					if(places.size() > 0) {
+						for(Enumeration e = places.elements(); e.hasMoreElements();) {
+							JSONObject p = (JSONObject) e.nextElement();
+							String name = p.getString("name");
+							JSONObject price = p.getObject("price");
+							if(name != null) {
+								r += name + ": ";
+							}
+							r += price.getInt("whole") + "." + price.getInt("cents") + " " + p.getString("currency") + "\n";
+						}
+						s = new StringItem(null, r + "\n");
+						s.setFont(Font.getFont(0, 0, Font.SIZE_SMALL));
+						f.append(s);
+					}
+				}
 				if(thread.has("vehicle") && !thread.isNull("vehicle")) {
-					StringItem v = new StringItem(null, thread.getString("vehicle") + "\n");
-					v.setFont(Font.getFont(0, 0, Font.SIZE_SMALL));
-					f.append(v);
+					s = new StringItem(null, thread.getString("vehicle") + "\n");
+					s.setFont(Font.getFont(0, 0, Font.SIZE_SMALL));
+					f.append(s);
+				}
+				if(thread.has("transport_subtype")) {
+					JSONObject subtype = thread.getObject("transport_subtype");
+					if(!subtype.isNull("title")) {
+						s = new StringItem(null, subtype.getString("title") + "\n");
+						s.setFont(Font.getFont(0, 0, Font.SIZE_SMALL));
+						f.append(s);
+					}
 				}
 				if(thread.has("carrier")) {
 					JSONObject carrier = thread.getObject("carrier");
-					StringItem c = new StringItem(null, carrier.getString("title") + "\n");
-					c.setFont(Font.getFont(0, 0, Font.SIZE_SMALL));
-					f.append(c);
+					s = new StringItem(null, carrier.getString("title") + "\n");
+					s.setFont(Font.getFont(0, 0, Font.SIZE_SMALL));
+					f.append(s);
 				}
 			}
 			

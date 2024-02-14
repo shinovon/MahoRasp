@@ -67,7 +67,9 @@ public class JSONObject extends AbstractJSON {
 	}
 	
 	public String getString(String name) throws JSONException {
-		return String.valueOf(get(name));
+		Object o = get(name);
+		if(o == null) return null;
+		return String.valueOf(o);
 	}
 	
 	public String getString(String name, String def) {
