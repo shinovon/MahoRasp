@@ -18,6 +18,7 @@ import javax.microedition.lcdui.CommandListener;
 import javax.microedition.lcdui.DateField;
 import javax.microedition.lcdui.Display;
 import javax.microedition.lcdui.Displayable;
+import javax.microedition.lcdui.Font;
 import javax.microedition.lcdui.Form;
 import javax.microedition.lcdui.Gauge;
 import javax.microedition.lcdui.Image;
@@ -164,8 +165,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		toBtn.setDefaultCommand(choosePointCmd);
 		toBtn.setItemCommandListener(this);
 		mainForm.append(toBtn);
-		showTransfers = new ChoiceGroup("", Choice.MULTIPLE, new String[] { "Показывать с пересадками" }, null);
-		showTransfers.setSelectedIndex(0, true);
+		showTransfers = new ChoiceGroup("", Choice.MULTIPLE, new String[] { "С пересадками" }, null);
 		mainForm.append(showTransfers);
 		submitBtn = new StringItem(null, "Найти", StringItem.BUTTON);
 		submitBtn.setLayout(Item.LAYOUT_EXPAND | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_NEWLINE_BEFORE);
@@ -242,6 +242,12 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			return;
 		}
 		if(c == backCmd) {
+			if(resultForm == d) {
+				resultForm = null;
+			} else if(resultForm != null && d instanceof Form) {
+				display(resultForm);
+				return;
+			}
 			display(mainForm);
 			return;
 		}
@@ -450,10 +456,86 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			Form f = new Form("");
 			f.addCommand(backCmd);
 			f.setCommandListener(this);
-			//TODO
-			JSONObject j = result.getArray("segments").getObject(selectedItem);
+			// TODO interval_segments, tickets_info, stops, departure_platform, departure_terminal
+			JSONObject seg = result.getArray("segments").getObject(selectedItem);
 			
-			f.append(j.format());
+			if(seg.getBoolean("has_transfers")) {
+				JSONArray types = seg.getArray("transport_types");
+				String title = seg.getObject("departure_from").getString("title") + " - " + seg.getObject("arrival_to").getString("title");
+				f.setTitle(title);
+				StringItem t = new StringItem(null, title + "\n");
+				t.setFont(Font.getFont(0, 0, Font.SIZE_LARGE));
+				f.append(t);
+				if(seg.has("details")) {
+					JSONArray details = seg.getArray("details");
+					int i = 0;
+					for(Enumeration e = details.elements(); e.hasMoreElements(); ) {
+						JSONObject n = (JSONObject) e.nextElement();
+						if(n.has("thread")) {
+							JSONObject th = n.getObject("thread");
+							Calendar departure = parseDate(n.getString("departure"));
+							Calendar arrival = parseDate(n.getString("arrival"));
+							f.append(new ImageItem(null, transportImg(types.getString(i)), Item.LAYOUT_LEFT, null));
+							StringItem s2 = new StringItem(null, th.getString("number") + " " + th.getString("title") + "\n\n");
+							s2.setFont(Font.getFont(0, 0, Font.SIZE_MEDIUM));
+							f.append(s2);
+							StringItem s = new StringItem(null,
+									"Отправление: " + point(n.getObject("from"))  + "\n" +
+									shortDate(departure) + " " + time(departure) + "\n" +
+									"Прибытие: " + point(n.getObject("to")) + "\n" +
+									shortDate(arrival) + " " + time(arrival) + "\n" +
+									(n.has("duration") ? (duration(n.getInt("duration") / 60) + "\n") : "") + "\n"
+									);
+							s.setFont(Font.getFont(0, 0, Font.SIZE_SMALL));
+							f.append(s);
+							i++;
+						} else if(n.getBoolean("is_transfer", false)) {
+							StringItem s2 = new StringItem(null,
+									"Пересадка в " + point(n.getObject("transfer_point")) + "\n"
+									);
+							s2.setFont(Font.getFont(0, 0, Font.SIZE_MEDIUM));
+							f.append(s2);
+							StringItem s = new StringItem(null,
+											"c: " + point(n.getObject("transfer_from")) + "\n" +
+											"на: " + point(n.getObject("transfer_to")) + "\n\n"
+									);
+							s.setFont(Font.getFont(0, 0, Font.SIZE_SMALL));
+							f.append(s);
+						}
+					}
+				}
+			} else {
+				JSONObject thread = seg.getObject("thread");
+				f.append(new ImageItem(null, transportImg(thread.getString("transport_type")), Item.LAYOUT_LEFT, null));
+				String title = thread.getString("number") + " " + thread.getString("title");
+				f.setTitle(title);
+				StringItem t = new StringItem(null, title + "\n");
+				t.setFont(Font.getFont(0, 0, Font.SIZE_LARGE));
+				f.append(t);
+				Calendar departure = parseDate(seg.getString("departure"));
+				Calendar arrival = parseDate(seg.getString("arrival"));
+				StringItem s = new StringItem(null,
+						"Отправление:\n" + point(seg.getObject("from")) + "\n" +
+						shortDate(departure) + " " + time(departure) + "\n\n" +
+						"Прибытие:\n" + point(seg.getObject("to")) + "\n" +
+						shortDate(arrival) + " " + time(arrival) + "\n" +
+						(seg.has("duration") ? (duration(seg.getInt("duration") / 60) + "\n") : "") + "\n"
+						);
+				s.setFont(Font.getFont(0, 0, Font.SIZE_SMALL));
+				f.append(s);
+
+				if(thread.has("vehicle") && !thread.isNull("vehicle")) {
+					StringItem v = new StringItem(null, thread.getString("vehicle") + "\n");
+					v.setFont(Font.getFont(0, 0, Font.SIZE_SMALL));
+					f.append(v);
+				}
+				if(thread.has("carrier")) {
+					JSONObject carrier = thread.getObject("carrier");
+					StringItem c = new StringItem(null, carrier.getString("title") + "\n");
+					c.setFont(Font.getFont(0, 0, Font.SIZE_SMALL));
+					f.append(c);
+				}
+			}
 			
 			display(f);
 			break;
@@ -591,6 +673,13 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		}
 		running = false;
 		run = 0;
+	}
+
+	private String point(JSONObject o) {
+		if("station".equals(o.getString("type"))) {
+			return o.getString("title") + " (" + o.getString("station_type_name") + ")";
+		}
+		return o.getString("title");
 	}
 
 	private void parseResults() {
@@ -855,10 +944,10 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	static String duration(int minutes) {
 		if(minutes > 24 * 60) {
 			int hours = minutes / 60;
-			return (hours / 24) + "д " + (hours % 24) + " ч";
+			return (hours / 24) + " д. " + (hours % 24) + " ч.";
 		}
 		if(minutes > 60) {
-			return (minutes / 60) + " ч " + (minutes % 60) + " мин";
+			return (minutes / 60) + " ч. " + (minutes % 60) + " мин";
 		}
 		return minutes + " мин";
 	}
@@ -916,8 +1005,30 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		return "%".concat(s.length() < 2 ? "0" : "").concat(s);
 	}
 	
+	private static byte[] downloadBytes(InputStream inputStream, int initialSize, int bufferSize, int expandSize) throws IOException {
+		if (initialSize <= 0) initialSize = bufferSize;
+		byte[] buf = new byte[initialSize];
+		int count = 0;
+		byte[] readBuf = new byte[bufferSize];
+		int readLen;
+		while ((readLen = inputStream.read(readBuf)) != -1) {
+			if(count + readLen > buf.length) {
+				byte[] newbuf = new byte[count + expandSize];
+				System.arraycopy(buf, 0, newbuf, 0, count);
+				buf = newbuf;
+			}
+			System.arraycopy(readBuf, 0, buf, count, readLen);
+			count += readLen;
+		}
+		if(buf.length == count) {
+			return buf;
+		}
+		byte[] res = new byte[count];
+		System.arraycopy(buf, 0, res, 0, count);
+		return res;
+	}
+	
 	static byte[] get(String url) throws IOException {
-		ByteArrayOutputStream o = null;
 		HttpConnection hc = null;
 		InputStream in = null;
 		try {
@@ -925,13 +1036,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			hc.setRequestMethod("GET");
 			hc.getResponseCode();
 			in = hc.openInputStream();
-			int read;
-			o = new ByteArrayOutputStream();
-			byte[] b = new byte[512];
-			while((read = in.read(b)) != -1) {
-				o.write(b, 0, read);
-			}
-			return o.toByteArray();
+			return downloadBytes(in, (int) hc.getLength(), 1024, 2048);
 		} finally {
 			try {
 				if (in != null) in.close();
@@ -941,14 +1046,11 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				if (hc != null) hc.close();
 			} catch (IOException e) {
 			}
-			try {
-				if (o != null) o.close();
-			} catch (IOException e) {
-			}
 		}
 	}
 	
 	static String getUtf(String url) throws IOException {
+		System.out.println(url);
 		return new String(get(url), "UTF-8");
 	}
 	
