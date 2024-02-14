@@ -18,7 +18,6 @@ public class GPS implements Runnable {
 				MahoRaspApp2.gpslon = c.getLongitude();
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
 			MahoRaspApp2.gpslat = 0;
 			MahoRaspApp2.gpslon = 0;
 		}

@@ -441,7 +441,6 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				parseResults();
 			} catch (Exception e) {
 				resultForm.append(e.toString());
-				e.printStackTrace();
 			}
 			display(resultForm);
 			break;
@@ -517,7 +516,6 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 //				searchForm.addCommand(cancelCmd);
 				searchCancel = true;
 			} catch (Exception e) {
-				e.printStackTrace();
 			} finally {
 				if(stream != null)
 					try {
@@ -545,7 +543,6 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 					l.append(bm.has("n") ? bm.getString("n") : bm.getString("c") + " - " + bm.getString("d"), null);
 				}
 			} catch (Exception e) {
-				e.printStackTrace();
 			}
 			display(l);
 			break;
@@ -571,7 +568,6 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				display(searchForm);
 			} catch (Exception e) {
 				display(warningAlert(e.toString()), searchForm);
-				e.printStackTrace();
 			}
 			searchForm.addCommand(doneCmd);
 			searchCancel = false;
