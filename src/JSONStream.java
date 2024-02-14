@@ -8,7 +8,6 @@ public class JSONStream {
 
 	private InputStream stream;
 	private InputStreamReader reader;
-	private boolean isObject;
 	int index;
 	private char prev;
 	private boolean usePrev;
@@ -20,11 +19,6 @@ public class JSONStream {
 	private void init(InputStream is) throws IOException {
 		this.stream = is;
 		this.reader = new InputStreamReader(is, "UTF-8");
-		char c = next();
-		if(c != '{' && c != '[') throw new JSONException("Not json");
-		isObject = c == '{';
-		if(!isObject) throw new JSONException("Arrays streaming not implemented");
-		usePrev = true;
 	}
 	
 	String nextString() throws IOException {
@@ -64,9 +58,10 @@ public class JSONStream {
 		}
 	}
 	
-	void assertNext(String f, char c) throws IOException {
+	void assertNext(char c) throws IOException {
 		char n;
-		if((n = next()) != c) throw new JSONException(f + ": Assertion failed: \'" + n + "\', expected: " + c + " at " + (index-1));
+		if((n = next()) != c)
+			throw new JSONException("Got \'" + n + "\', expected: " + c + " at " + index);
 	}
 	
 	void back() {

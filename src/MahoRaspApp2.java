@@ -38,6 +38,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static final Command backCmd = new Command("Назад", Command.BACK, 1);
 	private static final Command submitCmd = new Command("Искать", Command.ITEM, 2);
 	private static final Command itemCmd = new Command("Подробнее", Command.ITEM, 2);
+	private static final Command settingsCmd = new Command("Настройки", Command.SCREEN, 3);
+	private static final Command aboutCmd = new Command("О программе", Command.SCREEN, 4);
 	
 	private static final Command choosePointCmd = new Command("Выбрать", Command.ITEM, 1);
 
@@ -99,6 +101,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		midlet = this;
 		mainForm = new Form("MahoRasp");
 		mainForm.addCommand(exitCmd);
+		mainForm.addCommand(settingsCmd);
+		mainForm.addCommand(aboutCmd);
 		mainForm.setCommandListener(this);
 		transportChoice = new ChoiceGroup("Тип транспорта", Choice.POPUP, TRANSPORT_NAMES, null);
 		mainForm.append(transportChoice);
@@ -119,7 +123,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		mainForm.append(toBtn);
 //		showTransfers = new ChoiceGroup("", Choice.EXCLUSIVE, new String[] { "Показывать пересадки" }, null);
 //		mainForm.append(showTransfers);
-		submitBtn = new StringItem(null, "Показать маршруты", StringItem.BUTTON);
+		submitBtn = new StringItem(null, "Найти", StringItem.BUTTON);
 		submitBtn.setLayout(Item.LAYOUT_EXPAND | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_NEWLINE_BEFORE);
 		submitBtn.addCommand(submitCmd);
 		submitBtn.setDefaultCommand(submitCmd);
@@ -160,6 +164,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			searchField = new TextField("Поиск", "", 100, TextField.ANY);
 			searchField.setItemCommandListener(this);
 			searchForm.append(searchField);
+			// TODO показ ближайших городов по гпс
 			searchChoice = new ChoiceGroup("", Choice.EXCLUSIVE);
 			searchChoice.setFitPolicy(Choice.TEXT_WRAP_ON);
 			searchForm.append(searchChoice);
@@ -211,6 +216,15 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			select((String) searchIds.elementAt(i), searchChoice.getString(i));
 			return;
 		}
+		if(c == aboutCmd) {
+			Form f = new Form("О программе");
+			f.addCommand(backCmd);
+			f.setCommandListener(this);
+			f.append(new StringItem("MahoRasp v" + this.getAppProperty("MIDlet-Version"),
+					"Клиент Яндекс Расписаний.\n\nРазработал, дизайнил, придумал, украл апи ключ: shinovon\n\n292 labs"));
+			display(f);
+			return;
+		}
 	}
 
 	public void itemStateChanged(Item item) {
@@ -228,6 +242,9 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			resultForm = new Form("Результаты поиска");
 			resultForm.addCommand(backCmd);
 			resultForm.setCommandListener(this);
+			// TODO кмд добавить в закладки
+			// TODO кмд предыдущий, следующий день
+			// TODO скрытие уехавших
 			try {
 				Calendar cal = Calendar.getInstance();
 				cal.setTime(dateField.getDate());
@@ -307,21 +324,21 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				search: {
 					if(query.length() < 3) break search;
 					stream = getCitiesStream();
-					stream.assertNext("root", '{');
+					stream.assertNext('{');
 					while(true) {
 						stream.skipString();
-						stream.assertNext("countries", ':');
-						stream.assertNext("countries", '[');
+						stream.assertNext(':');
+						stream.assertNext('[');
 						String countryName = stream.nextString();
-						stream.assertNext("countries", ',');
+						stream.assertNext(',');
 						while(true) {
-							stream.assertNext("regions", '[');
+							stream.assertNext('[');
 							String regionName = stream.nextString();
-							stream.assertNext("regions", ',');
-							stream.assertNext("cities", '{');
+							stream.assertNext(',');
+							stream.assertNext('{');
 							while(true) {
 								String code = stream.nextString();
-								stream.assertNext("cities", ':');
+								stream.assertNext(':');
 								String cityName = stream.nextString();
 								if(cityName.toLowerCase().startsWith(query) || regionName.toLowerCase().startsWith(query)) {
 									searchChoice.append(cityName + ", " + regionName + ", " + countryName, null);
@@ -332,13 +349,13 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 									break;
 								}
 							}
-							stream.assertNext("regions", ']');
+							stream.assertNext(']');
 							if(stream.next() != ',') {
 								stream.back();
 								break;
 							}
 						}
-						stream.assertNext("countries", ']');
+						stream.assertNext(']');
 						if(stream.next() != ',') {
 							break;
 						}
