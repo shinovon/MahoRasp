@@ -303,7 +303,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			f.addCommand(backCmd);
 			f.setCommandListener(this);
 			f.append(new StringItem("MahoRasp v" + this.getAppProperty("MIDlet-Version"),
-					"Клиент Яндекс Расписаний.\n\nРазработал, дизайнил, придумал, украл апи ключ: shinovon\n\n292 labs"));
+					"Клиент Яндекс Расписаний.\nРазработал: shinovon\n\n292 labs"));
 			display(f);
 			return;
 		}
@@ -486,7 +486,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 								if(cityName.toLowerCase().startsWith(query) || regionName.toLowerCase().startsWith(query)) {
 									searchChoice.append(cityName + ", " + regionName/* + ", " + countryName*/, null);
 									searchIds.addElement(code);
-									if(searchChoice.size() > 10) break search;
+									if(searchChoice.size() > 15) break search;
 								}
 								if(stream.next() != ',') {
 									break;
@@ -590,7 +590,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		JSONObject search = result.getObject("search");
 		String title = search.getObject("from").getString("title") + " - " + search.getObject("to").getString("title");
 		resultTitle = title;
-		StringItem titleItem = new StringItem(searchDate, title + "\n");
+		StringItem titleItem = new StringItem(n(cal.get(Calendar.DAY_OF_MONTH)) + "." + n(cal.get(Calendar.MONTH) + 1) + "." + cal.get(Calendar.YEAR), title + "\n");
 		titleItem.setLayout(Item.LAYOUT_CENTER);
 		resultForm.append(titleItem);
 		
