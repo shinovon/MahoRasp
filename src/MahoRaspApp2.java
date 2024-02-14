@@ -570,6 +570,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			} catch (Exception e) {
 				display(warningAlert(e.toString()), searchForm);
 			}
+			searchForm.removeCommand(doneCmd);
 			searchForm.addCommand(doneCmd);
 			searchCancel = false;
 			break;
