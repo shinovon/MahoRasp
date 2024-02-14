@@ -199,7 +199,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 
 	public void commandAction(Command c, Item i) {
 		if(c == itemCmd) {
-			display(loadingAlert("Загрузка"));
+			display(loadingAlert("Загрузка"), null);
 			selectedItem = ((Integer) items.get(i)).intValue();
 			run(2);
 			return;
@@ -403,7 +403,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				break;
 			}
 			display(mainForm);
-			commandAction(submitCmd, d);
+//			commandAction(submitCmd, d);
 			return;
 		}
 	}
