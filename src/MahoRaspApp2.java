@@ -464,6 +464,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				String query = searchField.getString().toLowerCase().trim();
 				searchChoice.deleteAll();
 				searchIds.removeAllElements();
+				Vector primary = new Vector();
+				Vector secondary = new Vector();
 				search: {
 					if(query.length() < 3) break search;
 					stream = getCitiesStream();
@@ -483,10 +485,10 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 								String code = stream.nextString();
 								stream.assertNext(':');
 								String cityName = stream.nextString();
-								if(cityName.toLowerCase().startsWith(query) || regionName.toLowerCase().startsWith(query)) {
-									searchChoice.append(cityName + ", " + regionName/* + ", " + countryName*/, null);
-									searchIds.addElement(code);
-									if(searchChoice.size() > 15) break search;
+								if(cityName.toLowerCase().startsWith(query)/*|| (cityName + " " + regionName).toLowerCase().startsWith(query)*/) {
+									primary.addElement(new String[] {cityName, regionName, code});
+								} else if(regionName.toLowerCase().startsWith(query)) {
+									secondary.addElement(new String[] {cityName, regionName, code});
 								}
 								if(stream.next() != ',') {
 									break;
@@ -503,6 +505,17 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 							break;
 						}
 					}
+				}
+				for(Enumeration e = primary.elements(); e.hasMoreElements(); ) {
+					String[] s = (String[]) e.nextElement();
+					searchChoice.append(s[0] + ", " + s[1], null);
+					searchIds.addElement(s[2]);
+				}
+				for(Enumeration e = secondary.elements(); e.hasMoreElements(); ) {
+					if(searchChoice.size() > 10) break;
+					String[] s = (String[]) e.nextElement();
+					searchChoice.append(s[0] + ", " + s[1], null);
+					searchIds.addElement(s[2]);
 				}
 				// замена функции "отмена" на "готово"
 				if(searchChoice.getSelectedIndex() != -1) {
