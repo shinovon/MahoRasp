@@ -43,7 +43,6 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static final Command bookmarksCmd = new Command("Закладки", Command.SCREEN, 3);
 //	private static final Command settingsCmd = new Command("Настройки", Command.SCREEN, 4);
 	private static final Command aboutCmd = new Command("О программе", Command.SCREEN, 5);
-	
 	private static final Command submitCmd = new Command("Искать", Command.ITEM, 2);
 	private static final Command choosePointCmd = new Command("Выбрать", Command.ITEM, 1);
 
@@ -51,20 +50,21 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static final Command prevDayCmd = new Command("Пред. день", Command.SCREEN, 3);
 	private static final Command nextDayCmd = new Command("След. день", Command.SCREEN, 4);
 	private static final Command addBookmarkCmd = new Command("Добавить в закладки", Command.SCREEN, 5);
-	
+	private static final Command showGoneCmd = new Command("Показать ушедшие", Command.ITEM, 2);
 	private static final Command itemCmd = new Command("Подробнее", Command.ITEM, 2);
 
 	// команды формы выбора
 	private static final Command doneCmd = new Command("Готово", Command.OK, 1);
 	private static final Command cancelCmd = new Command("Отмена", Command.CANCEL, 1);
 //	private static final Command searchCmd = new Command("Поиск", Command.ITEM, 2);
-	
+
 	private static final Command removeBookmarkCmd = new Command("Удалить", Command.ITEM, 2);
 	
 	private static final int RUN_REQUEST = 1;
 	private static final int RUN_ITEM_DETAILS = 2;
 	private static final int RUN_SEARCH = 3;
 	private static final int RUN_BOOKMARKS_SCREEN = 4;
+	private static final int RUN_UPDATE_RESULT = 5;
 	
 	private static final int BOOKMARK_CITIES = 1;
 	private static final int BOOKMARK_STATIONS = 2;
@@ -127,6 +127,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private JSONStream citiesStream;
 	
 	private JSONArray bookmarks;
+	
+	private boolean showGone;
 
 	public MahoRaspApp2() {
 		items = new Hashtable();
@@ -140,7 +142,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		transportChoice = new ChoiceGroup("Тип транспорта", Choice.POPUP, TRANSPORT_NAMES, null);
 		mainForm.append(transportChoice);
 		dateField = new DateField("Дата", DateField.DATE);
-		dateField.setDate(new Date(System.currentTimeMillis()));
+		dateField.setDate(new Date());
 		mainForm.append(dateField);
 		fromBtn = new StringItem("Откуда", "Не выбрано", Item.BUTTON);
 		fromBtn.setLayout(Item.LAYOUT_EXPAND | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_NEWLINE_BEFORE);
@@ -207,6 +209,13 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			searchForm.setCommandListener(this);
 			searchForm.setItemStateListener(this);
 			display(searchForm);
+			return;
+		}
+		if(c == showGoneCmd) {
+			if(running) return;
+			showGone = true;
+			display(loadingAlert("Загрузка"));
+			run(RUN_UPDATE_RESULT);
 			return;
 		}
 		commandAction(c, mainForm);
@@ -278,7 +287,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		}
 		if(c == bookmarksCmd) {
 			if(running) return;
-			loadingAlert("Загрузка");
+			display(loadingAlert("Загрузка"));
 			run(RUN_BOOKMARKS_SCREEN);
 			return;
 		}
@@ -334,6 +343,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			int idx;
 			((List)d).delete(idx = ((List)d).getSelectedIndex());
 			bookmarks.remove(idx);
+			display(infoAlert("Закладка удалена"));
 			return;
 		}
 		if(c == List.SELECT_COMMAND) { // выбрана закладка
@@ -375,58 +385,19 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			resultForm.addCommand(nextDayCmd);
 			resultForm.addCommand(addBookmarkCmd);
 			resultForm.setCommandListener(this);
-			// TODO скрытие уехавших
 			try {
 				Calendar cal = Calendar.getInstance();
 				cal.setTime(dateField.getDate());
 				searchDate = cal.get(Calendar.YEAR) + "-" + (cal.get(Calendar.MONTH) + 1) + "-" + cal.get(Calendar.DAY_OF_MONTH);
 				searchParams = "from=" + from + "&to=" + to;
 				int transport = transportChoice.getSelectedIndex();
-				result = api("search/?date=" + searchDate + "&" + searchParams + "&transfers=true" + (transport > 0 ? ("&transport_types=" + TRANSPORT_TYPES[transport - 1]) : ""));
-				
-				JSONObject search = result.getObject("search");
-				StringItem titleItem = new StringItem(searchDate, search.getObject("from").getString("title") + " - " + search.getObject("to").getString("title") + "\n");
-				titleItem.setLayout(Item.LAYOUT_CENTER);
-				resultForm.append(titleItem);
-				
-				StringItem left = new StringItem(null, "");
-				left.setLayout(Item.LAYOUT_LEFT | Item.LAYOUT_NEWLINE_BEFORE);
-				resultForm.append(left);
-				
-				JSONArray segments = result.getArray("segments");
-				int size = segments.size();
-				if(size == 0) {
-					left.setText("Пусто!");
-				}
-				for(int i = 0; i < size; i++) {
-					JSONObject seg = segments.getObject(i);
-					String r = "";
-					if(seg.getBoolean("has_transfers")) {
-						JSONArray types = seg.getArray("transport_types");
-						for(int j = 0; j < types.size(); j++) {
-							resultForm.append(new ImageItem(null, transportImg(types.getString(j)), Item.LAYOUT_LEFT, null));
-						}
-						JSONObject from = seg.getObject("departure_from");
-						JSONObject to = seg.getObject("arrival_to");
-						r += from.getString("title") + " - " + to.getString("title") + "\n";
-						r += "с пересадками\n";
-					} else {
-						JSONObject thread = seg.getObject("thread");
-						r += thread.getString("number") + " " + thread.getString("title") + "\n";
-						resultForm.append(new ImageItem(null, transportImg(thread.getString("transport_type")), Item.LAYOUT_LEFT, null));
-					}
-					Calendar departure = parseDate(seg.getString("departure"));
-					Calendar arrival = parseDate(seg.getString("arrival"));
-					r += (oneDay(cal, departure) ? time(departure) : shortDate(departure) + " " + time(departure));
-					r += " - " + (oneDay(cal, arrival) ? time(arrival) : shortDate(arrival) + " " + time(arrival)) + "\n";
-					StringItem s = new StringItem("", r + "\n");
-					s.addCommand(itemCmd);
-					s.setDefaultCommand(itemCmd);
-					s.setItemCommandListener(this);
-					s.setLayout(Item.LAYOUT_LEFT);
-					items.put(s, new Integer(i));
-					resultForm.append(s);
-				}
+				result = api("search/?date=" +
+						searchDate + "&" +
+						searchParams +
+						"&transfers=true" +
+						(transport > 0 ? ("&transport_types=" + TRANSPORT_TYPES[transport - 1]) : "")
+						);
+				parseResults();
 			} catch (Exception e) {
 				resultForm.append(e.toString());
 				e.printStackTrace();
@@ -538,9 +509,81 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			display(l);
 			break;
 		}
+		case RUN_UPDATE_RESULT: {
+			if(result == null) break;
+			items.clear();
+			resultForm.deleteAll();
+			parseResults();
+			display(resultForm);
+			break;
+		}
 		}
 		running = false;
 		run = 0;
+	}
+
+	private void parseResults() {
+		Calendar cal = Calendar.getInstance();
+		cal.setTime(dateField.getDate());
+		Calendar now = Calendar.getInstance();
+		now.setTime(new Date());
+		JSONObject search = result.getObject("search");
+		StringItem titleItem = new StringItem(searchDate, search.getObject("from").getString("title") + " - " + search.getObject("to").getString("title") + "\n");
+		titleItem.setLayout(Item.LAYOUT_CENTER);
+		resultForm.append(titleItem);
+		
+		StringItem left = new StringItem(null, "");
+		left.setLayout(Item.LAYOUT_LEFT | Item.LAYOUT_NEWLINE_BEFORE);
+		int idx = resultForm.append(left);
+		
+		JSONArray segments = result.getArray("segments");
+		int size = segments.size();
+		if(size == 0) {
+			left.setText("Пусто!");
+		}
+		int goneCount = 0;
+		for(int i = 0; i < size; i++) {
+			JSONObject seg = segments.getObject(i);
+			Calendar departure = parseDate(seg.getString("departure"));
+			if(!showGone && oneDay(now, departure) && departure.before(now)) {
+				goneCount++;
+				continue;
+			}
+			Calendar arrival = parseDate(seg.getString("arrival"));
+			String r = "";
+			if(seg.getBoolean("has_transfers")) {
+				JSONArray types = seg.getArray("transport_types");
+				for(int j = 0; j < types.size(); j++) {
+					resultForm.append(new ImageItem(null, transportImg(types.getString(j)), Item.LAYOUT_LEFT, null));
+				}
+				JSONObject from = seg.getObject("departure_from");
+				JSONObject to = seg.getObject("arrival_to");
+				r += from.getString("title") + " - " + to.getString("title") + "\n";
+				r += "с пересадками\n";
+			} else {
+				JSONObject thread = seg.getObject("thread");
+				r += thread.getString("number") + " " + thread.getString("title") + "\n";
+				resultForm.append(new ImageItem(null, transportImg(thread.getString("transport_type")), Item.LAYOUT_LEFT, null));
+			}
+			r += (oneDay(cal, departure) ? time(departure) : shortDate(departure) + " " + time(departure));
+			r += " - " + (oneDay(cal, arrival) ? time(arrival) : shortDate(arrival) + " " + time(arrival)) + "\n";
+			StringItem s = new StringItem("", r + "\n");
+			s.addCommand(itemCmd);
+			s.setDefaultCommand(itemCmd);
+			s.setItemCommandListener(this);
+			s.setLayout(Item.LAYOUT_LEFT);
+			items.put(s, new Integer(i));
+			resultForm.append(s);
+		}
+		
+		if(goneCount > 0) {
+			StringItem showGoneBtn = new StringItem(null, "Показать ушедшие (" + goneCount + ")", Item.BUTTON);
+			showGoneBtn.setLayout(Item.LAYOUT_EXPAND | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_NEWLINE_BEFORE);
+			showGoneBtn.addCommand(showGoneCmd);
+			showGoneBtn.setDefaultCommand(showGoneCmd);
+			showGoneBtn.setItemCommandListener(this);
+			resultForm.insert(idx, showGoneBtn);
+		}
 	}
 
 	private void run(int run) {
