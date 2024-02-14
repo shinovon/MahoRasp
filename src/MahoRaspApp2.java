@@ -3,6 +3,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
 
@@ -24,9 +25,11 @@ import javax.microedition.lcdui.ImageItem;
 import javax.microedition.lcdui.Item;
 import javax.microedition.lcdui.ItemCommandListener;
 import javax.microedition.lcdui.ItemStateListener;
+import javax.microedition.lcdui.List;
 import javax.microedition.lcdui.StringItem;
 import javax.microedition.lcdui.TextField;
 import javax.microedition.midlet.MIDlet;
+import javax.microedition.rms.RecordStore;
 
 import cc.nnproject.json.JSON;
 import cc.nnproject.json.JSONArray;
@@ -34,41 +37,68 @@ import cc.nnproject.json.JSONObject;
 
 public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommandListener, Runnable, ItemStateListener {
 
+	// команды главной формы
 	private static final Command exitCmd = new Command("Выход", Command.EXIT, 1);
 	private static final Command backCmd = new Command("Назад", Command.BACK, 1);
-	private static final Command submitCmd = new Command("Искать", Command.ITEM, 2);
-	private static final Command itemCmd = new Command("Подробнее", Command.ITEM, 2);
-	private static final Command settingsCmd = new Command("Настройки", Command.SCREEN, 3);
-	private static final Command aboutCmd = new Command("О программе", Command.SCREEN, 4);
+	private static final Command bookmarksCmd = new Command("Закладки", Command.SCREEN, 3);
+//	private static final Command settingsCmd = new Command("Настройки", Command.SCREEN, 4);
+	private static final Command aboutCmd = new Command("О программе", Command.SCREEN, 5);
 	
+	private static final Command submitCmd = new Command("Искать", Command.ITEM, 2);
 	private static final Command choosePointCmd = new Command("Выбрать", Command.ITEM, 1);
 
-	private static final Command searchCmd = new Command("Поиск", Command.ITEM, 2);
+	// команды формы результатов
+	private static final Command prevDayCmd = new Command("Пред. день", Command.SCREEN, 3);
+	private static final Command nextDayCmd = new Command("След. день", Command.SCREEN, 4);
+	private static final Command addBookmarkCmd = new Command("Добавить в закладки", Command.SCREEN, 5);
+	
+	private static final Command itemCmd = new Command("Подробнее", Command.ITEM, 2);
+
+	// команды формы выбора
 	private static final Command doneCmd = new Command("Готово", Command.OK, 1);
 	private static final Command cancelCmd = new Command("Отмена", Command.CANCEL, 1);
+//	private static final Command searchCmd = new Command("Поиск", Command.ITEM, 2);
 	
+	private static final Command removeBookmarkCmd = new Command("Удалить", Command.ITEM, 2);
+	
+	private static final int RUN_REQUEST = 1;
+	private static final int RUN_ITEM_DETAILS = 2;
+	private static final int RUN_SEARCH = 3;
+	private static final int RUN_BOOKMARKS_SCREEN = 4;
+	
+	private static final int BOOKMARK_CITIES = 1;
+	private static final int BOOKMARK_STATIONS = 2;
+	private static final int BOOKMARK_ROUTE = 3;
+	
+	// апи ключ
 	private static final String APIKEY = "20e7cb3e-6b05-4774-bcbb-4b0fb74a58b0";
 
+	private static final String[] TRANSPORT_TYPES = new String[] {
+		"plane", "train", "suburban", "bus", "water", "helicopter"
+	};
 	private static final String[] TRANSPORT_NAMES = new String[] {
 		"Любой", "Самолет", "Поезд", "Электричка", "Автобус",
 		//"Морской транспорт", "Вертолет"
 	};
 	
-	private static final String[] TRANSPORT_TYPES = new String[] {
-		"plane", "train", "suburban", "bus", "water", "helicopter"
-	};
+	// Константы названий RecordStore
+//	private static final String SETTINGS_RECORDNAME = "mahoRsets";
+	private static final String BOOKMARKS_RECORDNAME = "mahoRbm";
 
 	public static MahoRaspApp2 midlet;
 	
+	private boolean started;
+	
+	// ui главной
 	private Form mainForm;
-	private Form resultForm;
-
 	private ChoiceGroup transportChoice;
 	private DateField dateField;
 	private StringItem fromBtn;
 	private StringItem toBtn;
 	private StringItem submitBtn;
 //	private ChoiceGroup showTransfers;
+	
+	private Form resultForm;
 
 	private Image planeImg;
 	private Image trainImg;
@@ -77,7 +107,9 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 
 	private int run;
 	private boolean running;
-
+	
+	private String from;
+	private String to;
 	private String searchDate;
 	private String searchParams;
 
@@ -85,23 +117,24 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private Hashtable items;
 	private int selectedItem;
 	
-	private String from;
-	private String to;
-	private int choosing;
-	
 	private Form searchForm;
 	private TextField searchField;
 	private ChoiceGroup searchChoice;
+	
+	private int choosing;
+	private Vector searchIds = new Vector();
 	private boolean searchCancel;
 	private JSONStream citiesStream;
-	private Vector searchIds = new Vector();
+	
+	private JSONArray bookmarks;
 
 	public MahoRaspApp2() {
 		items = new Hashtable();
 		midlet = this;
 		mainForm = new Form("MahoRasp");
 		mainForm.addCommand(exitCmd);
-		mainForm.addCommand(settingsCmd);
+		mainForm.addCommand(bookmarksCmd);
+//		mainForm.addCommand(settingsCmd);
 		mainForm.addCommand(aboutCmd);
 		mainForm.setCommandListener(this);
 		transportChoice = new ChoiceGroup("Тип транспорта", Choice.POPUP, TRANSPORT_NAMES, null);
@@ -140,6 +173,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	}
 
 	protected void startApp() {
+		if(started) return;
+		started = true;
 		try {
 			planeImg = Image.createImage("/plane.png");
 			trainImg = Image.createImage("/train.png");
@@ -188,21 +223,19 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		}
 		if(c == submitCmd) {
 			if(running) return;
-
 			if(from == null || to == null) {
 				display(warningAlert("Не выбран один из пунктов"));
 				return;
 			}
 			display(loadingAlert("Загрузка"));
-			run(1);
+			run(RUN_REQUEST);
 			return;
 		}
-		if(c == searchCmd) {
-			// не выполнять поиск если текущий поток поиска занят
-			if(running) return;
-			run(3);
-			return;
-		}
+//		if(c == searchCmd) {
+//			if(running) return;
+//			run(RUN_SEARCH);
+//			return;
+//		}
 		if(c == cancelCmd) {
 			cancelChoice();
 			return;
@@ -225,25 +258,123 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			display(f);
 			return;
 		}
+		if(c == prevDayCmd) {
+			if(running) return;
+			Date date = dateField.getDate();
+			date.setTime(date.getTime()-24*60*60*1000);
+			dateField.setDate(date);
+			display(loadingAlert("Загрузка"));
+			run(RUN_REQUEST);
+			return;
+		}
+		if(c == nextDayCmd) {
+			if(running) return;
+			Date date = dateField.getDate();
+			date.setTime(date.getTime()+24*60*60*1000);
+			dateField.setDate(date);
+			display(loadingAlert("Загрузка"));
+			run(RUN_REQUEST);
+			return;
+		}
+		if(c == bookmarksCmd) {
+			if(running) return;
+			loadingAlert("Загрузка");
+			run(RUN_BOOKMARKS_SCREEN);
+			return;
+		}
+		if(c == addBookmarkCmd) {
+			if(from == null || to == null) {
+				display(warningAlert("Не выбран один из пунктов"));
+				return;
+			}
+			String fn = fromBtn.getText();
+			String tn = toBtn.getText();
+			
+			if(bookmarks == null) {
+				try {
+					RecordStore r = RecordStore.openRecordStore(BOOKMARKS_RECORDNAME, false);
+					bookmarks = JSON.getArray(new String(r.getRecord(1), "UTF-8"));
+					r.closeRecordStore();
+				} catch (Exception e) {
+					bookmarks = new JSONArray();
+				}
+			} else {
+				// есть ли уже такая закладка
+				int l = bookmarks.size();
+				for(int i = 0; i < l; i++) {
+					JSONObject j = bookmarks.getObject(i);
+					if(j.getInt("t") == BOOKMARK_CITIES && fn.equals(j.getString("c")) && tn.equals(j.getString("d"))) return;  
+				}
+			}
+			
+			JSONObject bm = new JSONObject();
+			bm.put("t", BOOKMARK_CITIES);
+			bm.put("a", from);
+			bm.put("b", to);
+			bm.put("c", fn);
+			bm.put("d", tn);
+			bookmarks.add(bm);
+			
+			try {
+				RecordStore.deleteRecordStore(BOOKMARKS_RECORDNAME);
+			} catch (Exception e) {
+			}
+			try {
+				RecordStore r = RecordStore.openRecordStore(BOOKMARKS_RECORDNAME, true);
+				byte[] b = bookmarks.toString().getBytes("UTF-8");
+				r.addRecord(b, 0, b.length);
+				r.closeRecordStore();
+			} catch (Exception e) {
+			}
+			display(infoAlert("Закладка добавлена"));
+			return;
+		}
+		if(c == removeBookmarkCmd) {
+			if(bookmarks == null) return;
+			int idx;
+			((List)d).delete(idx = ((List)d).getSelectedIndex());
+			bookmarks.remove(idx);
+			return;
+		}
+		if(c == List.SELECT_COMMAND) { // выбрана закладка
+			if(bookmarks == null) return;
+			JSONObject bm = bookmarks.getObject(((List)d).getSelectedIndex());
+			switch(bm.getInt("t")) {
+			case BOOKMARK_CITIES:
+			case BOOKMARK_STATIONS:
+				from = bm.getString("a");
+				to = bm.getString("b");
+				fromBtn.setText(bm.getString("c"));
+				toBtn.setText(bm.getString("d"));
+				break;
+			case BOOKMARK_ROUTE:
+				// TODO
+				break;
+			}
+			display(mainForm);
+			commandAction(submitCmd, d);
+			return;
+		}
 	}
 
 	public void itemStateChanged(Item item) {
 		if(item == searchField) { // выполнять поиск при изменениях в поле ввода
 			if(running) return;
-			run(3);
+			run(RUN_SEARCH);
 		}
 	}
 	
 	public void run() {
 		running = true;
 		switch(run) {
-		case 1: { // запрос
+		case RUN_REQUEST: { // запрос
 			items.clear();
 			resultForm = new Form("Результаты поиска");
 			resultForm.addCommand(backCmd);
+			resultForm.addCommand(prevDayCmd);
+			resultForm.addCommand(nextDayCmd);
+			resultForm.addCommand(addBookmarkCmd);
 			resultForm.setCommandListener(this);
-			// TODO кмд добавить в закладки
-			// TODO кмд предыдущий, следующий день
 			// TODO скрытие уехавших
 			try {
 				Calendar cal = Calendar.getInstance();
@@ -303,7 +434,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			display(resultForm);
 			break;
 		}
-		case 2: { // показ подробнее
+		case RUN_ITEM_DETAILS: { // показ подробнее
 			Form f = new Form("");
 			f.addCommand(backCmd);
 			f.setCommandListener(this);
@@ -315,7 +446,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			display(f);
 			break;
 		}
-		case 3: { // поиск точки
+		case RUN_SEARCH: { // поиск точки
 			JSONStream stream = null;
 			try {
 				String query = searchField.getString().toLowerCase().trim();
@@ -329,7 +460,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 						stream.skipString();
 						stream.assertNext(':');
 						stream.assertNext('[');
-						String countryName = stream.nextString();
+						/*String countryName = */stream.nextString();
 						stream.assertNext(',');
 						while(true) {
 							stream.assertNext('[');
@@ -341,7 +472,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 								stream.assertNext(':');
 								String cityName = stream.nextString();
 								if(cityName.toLowerCase().startsWith(query) || regionName.toLowerCase().startsWith(query)) {
-									searchChoice.append(cityName + ", " + regionName + ", " + countryName, null);
+									searchChoice.append(cityName + ", " + regionName/* + ", " + countryName*/, null);
 									searchIds.addElement(code);
 									if(searchChoice.size() > 10) break search;
 								}
@@ -382,6 +513,29 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 					} catch (IOException e) {
 					}
 			}
+			break;
+		}
+		case RUN_BOOKMARKS_SCREEN: {
+			List l = new List("Закладки", List.IMPLICIT);
+			l.setFitPolicy(Choice.TEXT_WRAP_ON);
+			l.addCommand(backCmd);
+			l.addCommand(List.SELECT_COMMAND);
+			l.setCommandListener(this);
+			try {
+				if(bookmarks == null) {
+					RecordStore r = RecordStore.openRecordStore(BOOKMARKS_RECORDNAME, false);
+					bookmarks = JSON.getArray(new String(r.getRecord(1), "UTF-8"));
+					r.closeRecordStore();
+				}
+				l.addCommand(removeBookmarkCmd);
+				for(Enumeration e = bookmarks.elements(); e.hasMoreElements();) {
+					JSONObject bm = (JSONObject) e.nextElement();
+					l.append(bm.getString("c") + " - " + bm.getString("d"), null);
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			display(l);
 			break;
 		}
 		}
@@ -458,6 +612,14 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private Alert warningAlert(String text) {
 		Alert a = new Alert("");
 		a.setType(AlertType.ERROR);
+		a.setString(text);
+		a.setTimeout(2000);
+		return a;
+	}
+	
+	private Alert infoAlert(String text) {
+		Alert a = new Alert("");
+		a.setType(AlertType.INFO);
 		a.setString(text);
 		a.setTimeout(2000);
 		return a;
