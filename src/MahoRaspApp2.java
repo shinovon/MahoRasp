@@ -56,6 +56,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	// команды формы выбора
 	private static final Command doneCmd = new Command("Готово", Command.OK, 1);
 	private static final Command cancelCmd = new Command("Отмена", Command.CANCEL, 1);
+	private static final Command gpsCmd = new Command("Ближайший город", Command.ITEM, 2);
 //	private static final Command searchCmd = new Command("Поиск", Command.ITEM, 2);
 
 	private static final Command removeBookmarkCmd = new Command("Удалить", Command.ITEM, 2);
@@ -65,6 +66,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static final int RUN_SEARCH = 3;
 	private static final int RUN_BOOKMARKS_SCREEN = 4;
 	private static final int RUN_UPDATE_RESULT = 5;
+	private static final int RUN_NEAREST_CITY = 6;
 	
 	private static final int BOOKMARK_CITIES = 1;
 	private static final int BOOKMARK_STATIONS = 2;
@@ -86,6 +88,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static final String BOOKMARKS_RECORDNAME = "mahoRbm";
 
 	public static MahoRaspApp2 midlet;
+	private Display display;
 	
 	private boolean started;
 	
@@ -96,7 +99,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private StringItem fromBtn;
 	private StringItem toBtn;
 	private StringItem submitBtn;
-//	private ChoiceGroup showTransfers;
+	private ChoiceGroup showTransfers;
 	
 	private Form resultForm;
 
@@ -116,6 +119,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private JSONObject result;
 	private Hashtable items;
 	private int selectedItem;
+	private String resultTitle;
+	private boolean showGone;
 	
 	private Form searchForm;
 	private TextField searchField;
@@ -127,8 +132,11 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private JSONStream citiesStream;
 	
 	private JSONArray bookmarks;
-	
-	private boolean showGone;
+
+	private Alert gpsDialog;
+	private boolean gpsActive;
+	static double gpslat;
+	static double gpslon;
 
 	public MahoRaspApp2() {
 		items = new Hashtable();
@@ -156,8 +164,9 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		toBtn.setDefaultCommand(choosePointCmd);
 		toBtn.setItemCommandListener(this);
 		mainForm.append(toBtn);
-//		showTransfers = new ChoiceGroup("", Choice.EXCLUSIVE, new String[] { "Показывать пересадки" }, null);
-//		mainForm.append(showTransfers);
+		showTransfers = new ChoiceGroup("", Choice.MULTIPLE, new String[] { "Показывать пересадки" }, null);
+		showTransfers.setSelectedIndex(0, true);
+		mainForm.append(showTransfers);
 		submitBtn = new StringItem(null, "Найти", StringItem.BUTTON);
 		submitBtn.setLayout(Item.LAYOUT_EXPAND | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_NEWLINE_BEFORE);
 		submitBtn.addCommand(submitCmd);
@@ -177,6 +186,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	protected void startApp() {
 		if(started) return;
 		started = true;
+		display = Display.getDisplay(this);
 		try {
 			planeImg = Image.createImage("/plane.png");
 			trainImg = Image.createImage("/train.png");
@@ -201,7 +211,12 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			searchField = new TextField("Поиск", "", 100, TextField.ANY);
 			searchField.setItemCommandListener(this);
 			searchForm.append(searchField);
-			// TODO показ ближайших городов по гпс
+			StringItem gpsBtn = new StringItem(null, "Ближайший город", Item.BUTTON);
+			gpsBtn.setLayout(Item.LAYOUT_EXPAND | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_NEWLINE_BEFORE);
+			gpsBtn.addCommand(gpsCmd);
+			gpsBtn.setDefaultCommand(gpsCmd);
+			gpsBtn.setItemCommandListener(this);
+			searchForm.append(gpsBtn);
 			searchChoice = new ChoiceGroup("", Choice.EXCLUSIVE);
 			searchChoice.setFitPolicy(Choice.TEXT_WRAP_ON);
 			searchForm.append(searchChoice);
@@ -233,7 +248,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		if(c == submitCmd) {
 			if(running) return;
 			if(from == null || to == null) {
-				display(warningAlert("Не выбран один из пунктов"));
+				display(warningAlert("Не выбран один из пунктов"), null);
 				return;
 			}
 			display(loadingAlert("Загрузка"));
@@ -245,7 +260,32 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 //			run(RUN_SEARCH);
 //			return;
 //		}
+		if(c == gpsCmd) {
+			if(gpsActive) return;
+			gpsActive = true;
+			gpsDialog = new Alert("", "Ожидание геолокации", null, null);
+			gpsDialog.setTimeout(Alert.FOREVER);
+			gpsDialog.setIndicator(new Gauge(null, false, Gauge.INDEFINITE, Gauge.CONTINUOUS_RUNNING));
+			gpsDialog.addCommand(cancelCmd);
+			gpsDialog.setCommandListener(this);
+			display(gpsDialog, searchForm);
+			try {
+				Class.forName("javax.microedition.location.LocationProvider");
+				new Thread(new GPS()).start();
+			} catch (Throwable e) {
+				display(warningAlert(e.toString()), searchForm);
+			}
+			return;
+		}
 		if(c == cancelCmd) {
+			if(d == gpsDialog) {
+				gpsActive = false;
+				try {
+					GPS.reset();
+				} catch (Throwable e) {}
+				display(searchForm);
+				return;
+			}
 			cancelChoice();
 			return;
 		}
@@ -322,6 +362,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			bm.put("b", to);
 			bm.put("c", fn);
 			bm.put("d", tn);
+			if(resultTitle != null) bm.put("n", resultTitle);
 			bookmarks.add(bm);
 			
 			try {
@@ -335,7 +376,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				r.closeRecordStore();
 			} catch (Exception e) {
 			}
-			display(infoAlert("Закладка добавлена"));
+			display(infoAlert("Закладка добавлена"), null);
 			return;
 		}
 		if(c == removeBookmarkCmd) {
@@ -343,7 +384,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			int idx;
 			((List)d).delete(idx = ((List)d).getSelectedIndex());
 			bookmarks.remove(idx);
-			display(infoAlert("Закладка удалена"));
+			display(infoAlert("Закладка удалена"), null);
 			return;
 		}
 		if(c == List.SELECT_COMMAND) { // выбрана закладка
@@ -394,7 +435,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				result = api("search/?date=" +
 						searchDate + "&" +
 						searchParams +
-						"&transfers=true" +
+						(showTransfers.isSelected(0) ? "&transfers=true" : "") +
 						(transport > 0 ? ("&transport_types=" + TRANSPORT_TYPES[transport - 1]) : "")
 						);
 				parseResults();
@@ -501,7 +542,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				l.addCommand(removeBookmarkCmd);
 				for(Enumeration e = bookmarks.elements(); e.hasMoreElements();) {
 					JSONObject bm = (JSONObject) e.nextElement();
-					l.append(bm.getString("c") + " - " + bm.getString("d"), null);
+					l.append(bm.has("n") ? bm.getString("n") : bm.getString("c") + " - " + bm.getString("d"), null);
 				}
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -517,6 +558,25 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			display(resultForm);
 			break;
 		}
+		case RUN_NEAREST_CITY: {
+			searchChoice.deleteAll();
+			searchIds.removeAllElements();
+			display(loadingAlert("Загрузка"), searchForm);
+			try {
+				JSONObject r = api("nearest_settlement/?lat=" + gpslat + "&lng=" + gpslon);
+				if(r.has("title") && r.has("code")) {
+					searchChoice.append(r.getString("title"), null);
+					searchIds.addElement(r.getString("code"));
+				}
+				display(searchForm);
+			} catch (Exception e) {
+				display(warningAlert(e.toString()), searchForm);
+				e.printStackTrace();
+			}
+			searchForm.addCommand(doneCmd);
+			searchCancel = false;
+			break;
+		}
 		}
 		running = false;
 		run = 0;
@@ -528,7 +588,9 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		Calendar now = Calendar.getInstance();
 		now.setTime(new Date());
 		JSONObject search = result.getObject("search");
-		StringItem titleItem = new StringItem(searchDate, search.getObject("from").getString("title") + " - " + search.getObject("to").getString("title") + "\n");
+		String title = search.getObject("from").getString("title") + " - " + search.getObject("to").getString("title");
+		resultTitle = title;
+		StringItem titleItem = new StringItem(searchDate, title + "\n");
 		titleItem.setLayout(Item.LAYOUT_CENTER);
 		resultForm.append(titleItem);
 		
@@ -586,6 +648,18 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		}
 	}
 
+	void gpsDone() {
+		if(!gpsActive) return;
+		gpsActive = false;
+		if(gpslat == 0 && gpslon == 0) {
+			// поймать ванну не удалось
+			display(warningAlert("Не удалось получить геолокацию"), searchForm);
+			return;
+		}
+		run(RUN_NEAREST_CITY);
+		display(searchForm);
+	}
+
 	private void run(int run) {
 		this.run = run;
 		new Thread(this).start();
@@ -636,12 +710,20 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		throw new RuntimeException("Unknown transport_type: " + transport);
 	}
 	
-	private void display(Displayable d) {
-		if(d instanceof Alert) {
-			Display.getDisplay(this).setCurrent((Alert) d, mainForm);
+	private void display(Alert a, Displayable d) {
+		if(d == null) {
+			display.setCurrent(a);
 			return;
 		}
-		Display.getDisplay(this).setCurrent(d);
+		display.setCurrent(a, d);
+	}
+	
+	private void display(Displayable d) {
+		if(d instanceof Alert) {
+			display.setCurrent((Alert) d, mainForm);
+			return;
+		}
+		display.setCurrent(d);
 	}
 
 	private Alert loadingAlert(String text) {
@@ -664,7 +746,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		Alert a = new Alert("");
 		a.setType(AlertType.INFO);
 		a.setString(text);
-		a.setTimeout(2000);
+		a.setTimeout(1500);
 		return a;
 	}
 	
