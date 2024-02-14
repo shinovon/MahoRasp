@@ -164,7 +164,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		toBtn.setDefaultCommand(choosePointCmd);
 		toBtn.setItemCommandListener(this);
 		mainForm.append(toBtn);
-		showTransfers = new ChoiceGroup("", Choice.MULTIPLE, new String[] { "Показывать пересадки" }, null);
+		showTransfers = new ChoiceGroup("", Choice.MULTIPLE, new String[] { "Показывать с пересадками" }, null);
 		showTransfers.setSelectedIndex(0, true);
 		mainForm.append(showTransfers);
 		submitBtn = new StringItem(null, "Найти", StringItem.BUTTON);
@@ -251,6 +251,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				display(warningAlert("Не выбран один из пунктов"), null);
 				return;
 			}
+			showGone = false;
 			display(loadingAlert("Загрузка"));
 			run(RUN_REQUEST);
 			return;
@@ -303,7 +304,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			f.addCommand(backCmd);
 			f.setCommandListener(this);
 			f.append(new StringItem("MahoRasp v" + this.getAppProperty("MIDlet-Version"),
-					"Клиент Яндекс Расписаний.\nРазработал: shinovon\n\n292 labs"));
+					"Клиент Яндекс Расписаний\nРазработал: shinovon\n\n292 labs"));
 			display(f);
 			return;
 		}
