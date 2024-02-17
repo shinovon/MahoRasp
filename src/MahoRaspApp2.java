@@ -61,6 +61,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 
 	private static final Command removeBookmarkCmd = new Command("Удалить", Command.ITEM, 2);
 	
+	private static final Command hyperlinkCmd = new Command("Открыть", Command.ITEM, 2);
+	
 	private static final Font smallfont = Font.getFont(0, 0, Font.SIZE_SMALL);
 	
 	private static final int RUN_REQUEST = 1;
@@ -232,6 +234,13 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			run(RUN_UPDATE_RESULT);
 			return;
 		}
+		if(c == hyperlinkCmd) {
+			try {
+				if(platformRequest("http://" + ((StringItem) i).getText()))
+					notifyDestroyed();
+			} catch (Exception e) {}
+			return;
+		}
 		commandAction(c, mainForm);
 	}
 
@@ -309,8 +318,39 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			Form f = new Form("О программе");
 			f.addCommand(backCmd);
 			f.setCommandListener(this);
-			f.append(new StringItem("MahoRasp v" + this.getAppProperty("MIDlet-Version"),
-					"Клиент Яндекс Расписаний\nРазработал: shinovon\n\n292 labs"));
+			StringItem s;
+			try {
+				f.append(new ImageItem(null, Image.createImage("/icon.png"), Item.LAYOUT_LEFT, null));
+				s = new StringItem(null, "MahoRasp v" + this.getAppProperty("MIDlet-Version"));
+				s.setFont(Font.getFont(0, 0, Font.SIZE_LARGE));
+				s.setLayout(Item.LAYOUT_LEFT | Item.LAYOUT_VCENTER);
+				f.append(s);
+			} catch (IOException e) {
+			}
+			s = new StringItem(null, "J2ME клиент Яндекс.Расписаний\n\n");
+			s.setFont(Font.getDefaultFont());
+			s.setLayout(Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_LEFT);
+			f.append(s);
+			s = new StringItem("Разработал", "shinovon");
+			s.setLayout(Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_LEFT);
+			f.append(s);
+			s = new StringItem("Помогали", "sym_ansel\nMuseCat");
+			s.setLayout(Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_LEFT);
+			f.append(s);
+			s = new StringItem("Сайт", "nnp.nnchan.ru", Item.HYPERLINK);
+			s.setLayout(Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_LEFT);
+			s.setDefaultCommand(hyperlinkCmd);
+			s.setItemCommandListener(this);
+			f.append(s);
+			s = new StringItem("Чат", "t.me/nnmidletschat", Item.HYPERLINK);
+			s.setLayout(Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_LEFT);
+			s.setDefaultCommand(hyperlinkCmd);
+			s.setItemCommandListener(this);
+			f.append(s);
+			s = new StringItem(null, "\n292 labs");
+			s.setFont(Font.getDefaultFont());
+			s.setLayout(Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_LEFT);
+			f.append(s);
 			display(f);
 			return;
 		}
