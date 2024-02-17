@@ -206,6 +206,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			choosing = i == fromBtn ? 1 : 2;
 			// TODO выбор станции
 			searchForm = new Form("Выбор города");
+			searchCancel = true;
 			searchField = new TextField("Поиск", "", 100, TextField.ANY);
 			searchField.setItemCommandListener(this);
 			searchForm.append(searchField);
@@ -489,7 +490,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 									shortDate(departure) + " " + time(departure) + "\n" + d + "\n" +
 									"Прибытие: " + point(n.getObject("to")) + "\n" +
 									shortDate(arrival) + " " + time(arrival) + "\n" +
-									(n.has("duration") ? (duration(n.getInt("duration") / 60) + "\n") : "") + "\n"
+									(n.has("duration") ? (duration(n.getInt("duration")) + "\n") : "") + "\n"
 									);
 							s.setFont(smallfont);
 							f.append(s);
@@ -519,10 +520,10 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				f.append(t);
 				String m;
 				String d = "";
-				if(seg.has("departure_platform") && (m = seg.getString("departure_platform")) != null) {
+				if((m = seg.getNullableString("departure_platform")) != null && m.length() > 0) {
 					d = "Платформа: " + m + "\n";
 				}
-				if(seg.has("departure_terminal") && (m = seg.getString("departure_terminal")) != null) {
+				if((m = seg.getNullableString("departure_terminal")) != null && m.length() > 0) {
 					d = "Терминал: " + m + "\n";
 				}
 				Calendar departure = parseDate(seg.getString("departure"));
@@ -532,19 +533,19 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 						shortDate(departure) + " " + time(departure) + "\n" + d + "\n" +
 						"Прибытие:\n" + point(seg.getObject("to")) + "\n" +
 						shortDate(arrival) + " " + time(arrival) + "\n" +
-						(seg.has("duration") ? (duration(seg.getInt("duration") / 60) + "\n") : "") + "\n"
+						(seg.has("duration") ? (duration(seg.getInt("duration")) + "\n") : "") + "\n"
 						);
 				s.setFont(smallfont);
 				f.append(s);
-				m = seg.getNullableString("stops");
-				if(m != null && m.length() > 0) {
+				if((m = seg.getNullableString("stops")) != null && m.length() > 0) {
 					s = new StringItem(null, "Остановки: " + m + "\n\n");
 					s.setFont(smallfont);
 					f.append(s);
 				}
-				if(seg.has("tickets_info")) {
+				JSONObject o;
+				if((o = seg.getNullableObject("tickets_info")) != null) {
 					String r = "Цена:\n";
-					JSONArray places = seg.getObject("tickets_info").getArray("places");
+					JSONArray places = o.getArray("places");
 					if(places.size() > 0) {
 						for(Enumeration e = places.elements(); e.hasMoreElements();) {
 							JSONObject p = (JSONObject) e.nextElement();
@@ -560,22 +561,21 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 						f.append(s);
 					}
 				}
-				if(thread.has("vehicle") && !thread.isNull("vehicle")) {
-					s = new StringItem(null, thread.getString("vehicle") + "\n");
+				if((m = thread.getNullableString("vehicle")) != null && m.length() > 0) {
+					s = new StringItem(null, m + "\n");
 					s.setFont(smallfont);
 					f.append(s);
 				}
-				if(thread.has("transport_subtype")) {
-					JSONObject subtype = thread.getObject("transport_subtype");
-					if(!subtype.isNull("title")) {
-						s = new StringItem(null, subtype.getString("title") + "\n");
+				if((o = thread.getNullableObject("transport_subtype")) != null) {
+					m = o.getNullableString("title");
+					if(m != null && m.length() > 0) {
+						s = new StringItem(null, m + "\n");
 						s.setFont(smallfont);
 						f.append(s);
 					}
 				}
-				if(thread.has("carrier")) {
-					JSONObject carrier = thread.getObject("carrier");
-					s = new StringItem(null, carrier.getString("title") + "\n");
+				if((o = thread.getNullableObject("carrier")) != null) {
+					s = new StringItem(null, o.getString("title") + "\n");
 					s.setFont(smallfont);
 					f.append(s);
 				}
@@ -983,15 +983,20 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		}
 	}
 	
-	static String duration(int minutes) {
-		if(minutes > 24 * 60) {
-			int hours = minutes / 60;
+	static String duration(int t) {
+		t /= 60;
+		if(t > 24 * 60) {
+			int hours = t / 60;
+			if(hours == 0)
+				return (hours / 24) + " д.";
 			return (hours / 24) + " д. " + (hours % 24) + " ч.";
 		}
-		if(minutes > 60) {
-			return (minutes / 60) + " ч. " + (minutes % 60) + " мин";
+		if(t > 60) {
+			if(t % 60 == 0)
+				return (t / 60) + " ч.";
+			return (t / 60) + " ч. " + (t % 60) + " мин";
 		}
-		return minutes + " мин";
+		return t + " мин";
 	}
 	
 	static String[] split(String str, char d) {
