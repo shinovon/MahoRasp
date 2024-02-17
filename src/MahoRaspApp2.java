@@ -1,4 +1,3 @@
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Calendar;
@@ -62,6 +61,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 
 	private static final Command removeBookmarkCmd = new Command("Удалить", Command.ITEM, 2);
 	
+	private static final Font smallfont = Font.getFont(0, 0, Font.SIZE_SMALL);
+	
 	private static final int RUN_REQUEST = 1;
 	private static final int RUN_ITEM_DETAILS = 2;
 	private static final int RUN_SEARCH = 3;
@@ -70,8 +71,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static final int RUN_NEAREST_CITY = 6;
 	
 	private static final int BOOKMARK_CITIES = 1;
-	private static final int BOOKMARK_STATIONS = 2;
-	private static final int BOOKMARK_ROUTE = 3;
+//	private static final int BOOKMARK_STATIONS = 2;
+//	private static final int BOOKMARK_SEGMENT = 3;
 	
 	// апи ключ
 	private static final String APIKEY = "20e7cb3e-6b05-4774-bcbb-4b0fb74a58b0";
@@ -114,8 +115,6 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	
 	private String from;
 	private String to;
-	private String searchDate;
-	private String searchParams;
 
 	private JSONObject result;
 	private Hashtable items;
@@ -128,7 +127,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private ChoiceGroup searchChoice;
 	
 	private int choosing;
-	private Vector searchIds = new Vector();
+	private Vector searchIds;
 	private boolean searchCancel;
 	private JSONStream citiesStream;
 	
@@ -141,6 +140,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 
 	public MahoRaspApp2() {
 		items = new Hashtable();
+		searchIds = new Vector();
 		midlet = this;
 		mainForm = new Form("MahoRasp");
 		mainForm.addCommand(exitCmd);
@@ -176,11 +176,9 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	}
 
 	protected void destroyApp(boolean unconditional) {
-
 	}
 
 	protected void pauseApp() {
-
 	}
 
 	protected void startApp() {
@@ -243,6 +241,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		}
 		if(c == backCmd) {
 			if(resultForm == d) {
+				items.clear();
 				resultForm = null;
 			} else if(resultForm != null && d instanceof Form) {
 				display(resultForm);
@@ -399,15 +398,14 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			JSONObject bm = bookmarks.getObject(((List)d).getSelectedIndex());
 			switch(bm.getInt("t")) {
 			case BOOKMARK_CITIES:
-			case BOOKMARK_STATIONS:
+//			case BOOKMARK_STATIONS:
 				from = bm.getString("a");
 				to = bm.getString("b");
 				fromBtn.setText(bm.getString("c"));
 				toBtn.setText(bm.getString("d"));
 				break;
-			case BOOKMARK_ROUTE:
-				// TODO
-				break;
+//			case BOOKMARK_SEGMENT:
+//				break;
 			}
 			display(mainForm);
 //			commandAction(submitCmd, d);
@@ -436,8 +434,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			try {
 				Calendar cal = Calendar.getInstance();
 				cal.setTime(dateField.getDate());
-				searchDate = cal.get(Calendar.YEAR) + "-" + (cal.get(Calendar.MONTH) + 1) + "-" + cal.get(Calendar.DAY_OF_MONTH);
-				searchParams = "from=" + from + "&to=" + to;
+				String searchDate = cal.get(Calendar.YEAR) + "-" + (cal.get(Calendar.MONTH) + 1) + "-" + cal.get(Calendar.DAY_OF_MONTH);
+				String searchParams = "from=" + from + "&to=" + to;
 				int transport = transportChoice.getSelectedIndex();
 				result = api("search/?date=" +
 						searchDate + "&" +
@@ -456,7 +454,6 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			Form f = new Form("");
 			f.addCommand(backCmd);
 			f.setCommandListener(this);
-			// TODO departure_platform, departure_terminal
 			JSONObject seg = result.getArray("segments").getObject(selectedItem);
 			
 			if(seg.getBoolean("has_transfers")) {
@@ -473,20 +470,28 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 						JSONObject n = (JSONObject) e.nextElement();
 						if(n.has("thread")) {
 							JSONObject th = n.getObject("thread");
-							Calendar departure = parseDate(n.getString("departure"));
-							Calendar arrival = parseDate(n.getString("arrival"));
 							f.append(new ImageItem(null, transportImg(types.getString(i)), Item.LAYOUT_LEFT, null));
 							StringItem s2 = new StringItem(null, th.getString("number") + " " + th.getString("title") + "\n\n");
 							s2.setFont(Font.getFont(0, 0, Font.SIZE_MEDIUM));
 							f.append(s2);
+							String m;
+							String d = "";
+							if(n.has("departure_platform") && (m = n.getString("departure_platform")) != null) {
+								d = "Платформа: " + m + "\n";
+							}
+							if(n.has("departure_terminal") && (m = n.getString("departure_terminal")) != null) {
+								d = "Терминал: " + m + "\n";
+							}
+							Calendar departure = parseDate(seg.getString("departure"));
+							Calendar arrival = parseDate(seg.getString("arrival"));
 							StringItem s = new StringItem(null,
-									"Отправление: " + point(n.getObject("from"))  + "\n" +
-									shortDate(departure) + " " + time(departure) + "\n" +
+									"Отправление: " + point(n.getObject("from")) + "\n" +
+									shortDate(departure) + " " + time(departure) + "\n" + d + "\n" +
 									"Прибытие: " + point(n.getObject("to")) + "\n" +
 									shortDate(arrival) + " " + time(arrival) + "\n" +
 									(n.has("duration") ? (duration(n.getInt("duration") / 60) + "\n") : "") + "\n"
 									);
-							s.setFont(Font.getFont(0, 0, Font.SIZE_SMALL));
+							s.setFont(smallfont);
 							f.append(s);
 							i++;
 						} else if(n.getBoolean("is_transfer", false)) {
@@ -499,7 +504,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 											"c: " + point(n.getObject("transfer_from")) + "\n" +
 											"на: " + point(n.getObject("transfer_to")) + "\n\n"
 									);
-							s.setFont(Font.getFont(0, 0, Font.SIZE_SMALL));
+							s.setFont(smallfont);
 							f.append(s);
 						}
 					}
@@ -512,21 +517,29 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				StringItem t = new StringItem(null, title + "\n");
 				t.setFont(Font.getFont(0, 0, Font.SIZE_LARGE));
 				f.append(t);
+				String m;
+				String d = "";
+				if(seg.has("departure_platform") && (m = seg.getString("departure_platform")) != null) {
+					d = "Платформа: " + m + "\n";
+				}
+				if(seg.has("departure_terminal") && (m = seg.getString("departure_terminal")) != null) {
+					d = "Терминал: " + m + "\n";
+				}
 				Calendar departure = parseDate(seg.getString("departure"));
 				Calendar arrival = parseDate(seg.getString("arrival"));
 				StringItem s = new StringItem(null,
 						"Отправление:\n" + point(seg.getObject("from")) + "\n" +
-						shortDate(departure) + " " + time(departure) + "\n\n" +
+						shortDate(departure) + " " + time(departure) + "\n" + d + "\n" +
 						"Прибытие:\n" + point(seg.getObject("to")) + "\n" +
 						shortDate(arrival) + " " + time(arrival) + "\n" +
 						(seg.has("duration") ? (duration(seg.getInt("duration") / 60) + "\n") : "") + "\n"
 						);
-				s.setFont(Font.getFont(0, 0, Font.SIZE_SMALL));
+				s.setFont(smallfont);
 				f.append(s);
-				String s1 = seg.getNullableString("stops");
-				if(s1 != null && s1.length() > 0) {
-					s = new StringItem(null, "Остановки: " + s1 + "\n\n");
-					s.setFont(Font.getFont(0, 0, Font.SIZE_SMALL));
+				m = seg.getNullableString("stops");
+				if(m != null && m.length() > 0) {
+					s = new StringItem(null, "Остановки: " + m + "\n\n");
+					s.setFont(smallfont);
 					f.append(s);
 				}
 				if(seg.has("tickets_info")) {
@@ -543,27 +556,27 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 							r += price.getInt("whole") + "." + price.getInt("cents") + " " + p.getString("currency") + "\n";
 						}
 						s = new StringItem(null, r + "\n");
-						s.setFont(Font.getFont(0, 0, Font.SIZE_SMALL));
+						s.setFont(smallfont);
 						f.append(s);
 					}
 				}
 				if(thread.has("vehicle") && !thread.isNull("vehicle")) {
 					s = new StringItem(null, thread.getString("vehicle") + "\n");
-					s.setFont(Font.getFont(0, 0, Font.SIZE_SMALL));
+					s.setFont(smallfont);
 					f.append(s);
 				}
 				if(thread.has("transport_subtype")) {
 					JSONObject subtype = thread.getObject("transport_subtype");
 					if(!subtype.isNull("title")) {
 						s = new StringItem(null, subtype.getString("title") + "\n");
-						s.setFont(Font.getFont(0, 0, Font.SIZE_SMALL));
+						s.setFont(smallfont);
 						f.append(s);
 					}
 				}
 				if(thread.has("carrier")) {
 					JSONObject carrier = thread.getObject("carrier");
 					s = new StringItem(null, carrier.getString("title") + "\n");
-					s.setFont(Font.getFont(0, 0, Font.SIZE_SMALL));
+					s.setFont(smallfont);
 					f.append(s);
 				}
 			}
@@ -643,6 +656,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 //				searchForm.addCommand(cancelCmd);
 				searchCancel = true;
 			} catch (Exception e) {
+				display(warningAlert(e.toString()), searchForm);
 			} finally {
 				if(stream != null)
 					try {
@@ -683,22 +697,17 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			break;
 		}
 		case RUN_NEAREST_CITY: {
-			searchChoice.deleteAll();
-			searchIds.removeAllElements();
 			display(loadingAlert("Загрузка"), searchForm);
 			try {
 				JSONObject r = api("nearest_settlement/?lat=" + gpslat + "&lng=" + gpslon);
 				if(r.has("title") && r.has("code")) {
-					searchChoice.append(r.getString("title"), null);
-					searchIds.addElement(r.getString("code"));
+					select(r.getString("code"), r.getString("title"));
+					break;
 				}
-				display(searchForm);
+				display(warningAlert("В пределах 10 км не найдено ни одного населенного пункта"), searchForm);
 			} catch (Exception e) {
 				display(warningAlert(e.toString()), searchForm);
 			}
-			searchForm.removeCommand(doneCmd);
-			searchForm.addCommand(doneCmd);
-			searchCancel = false;
 			break;
 		}
 		}
@@ -788,7 +797,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			return;
 		}
 		run(RUN_NEAREST_CITY);
-		display(searchForm);
+//		display(searchForm);
 	}
 
 	private void run(int run) {
@@ -807,6 +816,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			to = code;
 			toBtn.setText(title);
 		}
+		searchIds.removeAllElements();
 		display(mainForm);
 	}
 	
@@ -815,6 +825,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		searchForm = null;
 		searchField = null;
 		searchChoice = null;
+		searchIds.removeAllElements();
 	}
 	
 	private JSONStream getCitiesStream() throws IOException {
