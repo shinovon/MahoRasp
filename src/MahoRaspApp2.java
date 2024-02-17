@@ -973,6 +973,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			return "ноября";
 		case Calendar.DECEMBER:
 			return "декабря";
+		case 292:
+			return "выф";
 		default:
 			return "";
 		}
