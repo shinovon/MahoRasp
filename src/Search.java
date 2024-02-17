@@ -20,8 +20,7 @@ public class Search implements Runnable {
 				app.searchChoice.deleteAll();
 				app.searchIds.removeAllElements();
 				app.searchChoice.setLabel("Поиск...");
-				Vector primary = new Vector();
-				Vector secondary = new Vector();
+				Vector items = new Vector();
 				search: {
 					if(query.length() < 3) break search;
 					r = reader = app.openCitiesStream();
@@ -37,9 +36,10 @@ public class Search implements Runnable {
 							reader.skip(2);
 							String cityName = nextString();
 							if(cityName.toLowerCase().startsWith(query)) {
-								primary.addElement(new String[] {cityName, regionName, code});
+								app.searchChoice.append(cityName + ", " + regionName, null);
+								app.searchIds.addElement(code);
 							} else if(regionName.toLowerCase().startsWith(query)) {
-								secondary.addElement(new String[] {cityName, regionName, code});
+								items.addElement(new String[] {cityName, regionName, code});
 							}
 							if(reader.read() != ',') {
 								break;
@@ -52,12 +52,7 @@ public class Search implements Runnable {
 					}
 				}
 				if(app.searchForm == null || cancel) break s;
-				for(Enumeration e = primary.elements(); e.hasMoreElements(); ) {
-					String[] s = (String[]) e.nextElement();
-					app.searchChoice.append(s[0] + ", " + s[1], null);
-					app.searchIds.addElement(s[2]);
-				}
-				for(Enumeration e = secondary.elements(); e.hasMoreElements(); ) {
+				for(Enumeration e = items.elements(); e.hasMoreElements(); ) {
 					if(app.searchChoice.size() > 10) break;
 					String[] s = (String[]) e.nextElement();
 					app.searchChoice.append(s[0] + ", " + s[1], null);
