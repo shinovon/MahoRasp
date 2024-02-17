@@ -1,5 +1,6 @@
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Enumeration;
@@ -54,7 +55,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static final Command itemCmd = new Command("Подробнее", Command.ITEM, 2);
 
 	// команды формы выбора
-	private static final Command doneCmd = new Command("Готово", Command.OK, 1);
+	static final Command doneCmd = new Command("Готово", Command.OK, 1);
 	private static final Command cancelCmd = new Command("Отмена", Command.CANCEL, 1);
 	private static final Command gpsCmd = new Command("Ближайший город", Command.ITEM, 2);
 //	private static final Command searchCmd = new Command("Поиск", Command.ITEM, 2);
@@ -104,7 +105,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private StringItem toBtn;
 	private StringItem submitBtn;
 	private ChoiceGroup showTransfers;
-	
+
 	private Form resultForm;
 
 	private Image planeImg;
@@ -124,14 +125,16 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private String resultTitle;
 	private boolean showGone;
 	
-	private Form searchForm;
-	private TextField searchField;
-	private ChoiceGroup searchChoice;
-	
+	Form searchForm;
+	TextField searchField;
+	ChoiceGroup searchChoice;
+
 	private int choosing;
-	private Vector searchIds;
-	private boolean searchCancel;
-	private JSONStream citiesStream;
+	Vector searchIds;
+	boolean searchCancel;
+	private InputStream stream;
+	private Search search;
+	boolean searching;
 	
 	private JSONArray bookmarks;
 
@@ -141,9 +144,9 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	static double gpslon;
 
 	public MahoRaspApp2() {
+		midlet = this;
 		items = new Hashtable();
 		searchIds = new Vector();
-		midlet = this;
 		mainForm = new Form("MahoRasp");
 		mainForm.addCommand(exitCmd);
 		mainForm.addCommand(bookmarksCmd);
@@ -624,76 +627,20 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			display(f);
 			break;
 		}
-		case RUN_SEARCH: { // поиск точки
-			JSONStream stream = null;
-			try {
-				String query = searchField.getString().toLowerCase().trim();
-				searchChoice.deleteAll();
-				searchIds.removeAllElements();
-				Vector primary = new Vector();
-				Vector secondary = new Vector();
-				search: {
-					if(query.length() < 3) break search;
-					stream = getCitiesStream();
-					if(stream.next() != '{')
-						throw new Exception("Cities database is corrupted");
-					while(true) {
-						while(stream.next() != '[');
-						stream.skipString();
-						stream.skip(1);
-						while(true) {
-							stream.skip(1);
-							String regionName = stream.nextString();
-							stream.skip(2);
-							while(true) {
-								String code = stream.nextString();
-								stream.skip(1);
-								String cityName = stream.nextString();
-								if(cityName.toLowerCase().startsWith(query)/*|| (cityName + " " + regionName).toLowerCase().startsWith(query)*/) {
-									primary.addElement(new String[] {cityName, regionName, code});
-								} else if(regionName.toLowerCase().startsWith(query)) {
-									secondary.addElement(new String[] {cityName, regionName, code});
-								}
-								if(stream.next() != ',') {
-									break;
-								}
-							}
-							stream.skip(1);
-							if(stream.next() != ',') {
-								break;
-							}
-						}
-						if(stream.next() != ',') {
-							break;
-						}
+		case RUN_SEARCH: {
+			if(search == null) {
+				search = new Search();
+				search.app = this;
+			} else if(searching) {
+				search.reader = null;
+				search.cancel = true;
+				try {
+					synchronized(search) {
+						search.wait();
 					}
-				}
-				for(Enumeration e = primary.elements(); e.hasMoreElements(); ) {
-					String[] s = (String[]) e.nextElement();
-					searchChoice.append(s[0] + ", " + s[1], null);
-					searchIds.addElement(s[2]);
-				}
-				for(Enumeration e = secondary.elements(); e.hasMoreElements(); ) {
-					if(searchChoice.size() > 10) break;
-					String[] s = (String[]) e.nextElement();
-					searchChoice.append(s[0] + ", " + s[1], null);
-					searchIds.addElement(s[2]);
-				}
-				// замена функции "отмена" на "готово"
-				if(searchChoice.getSelectedIndex() != -1) {
-					if(!searchCancel) break;
-//					searchForm.removeCommand(cancelCmd);
-					searchForm.addCommand(doneCmd);
-					searchCancel = false;
-					break;
-				}
-				if(searchCancel) break;
-				searchForm.removeCommand(doneCmd);
-//				searchForm.addCommand(cancelCmd);
-				searchCancel = true;
-			} catch (Exception e) {
-				display(warningAlert(e.toString()), searchForm);
+				} catch (Exception e) {}
 			}
+			new Thread(search).start();
 			break;
 		}
 		case RUN_BOOKMARKS_SCREEN: {
@@ -852,23 +799,31 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	
 	private void cancelChoice() {
 		display(mainForm);
+		if(search != null) {
+			search.reader = null;
+			search.cancel = true;
+		}
 		searchForm = null;
 		searchField = null;
 		searchChoice = null;
 		searchIds.removeAllElements();
 	}
 	
-	private JSONStream getCitiesStream() throws IOException {
-		if(citiesStream != null) {
+	InputStreamReader openCitiesStream() throws IOException {
+		if(stream != null) {
 			try {
-				citiesStream.reset();
+				stream.reset();
+				return new InputStreamReader(new FilterStream(stream), "UTF-8");
 			} catch (Exception e) {
-				citiesStream.reset(getClass().getResourceAsStream("/cities.json"));
+				try {
+					stream.close();
+				} catch (IOException e2) {}
+				stream = getClass().getResourceAsStream("/cities.json");
+				return new InputStreamReader(new FilterStream(stream), "UTF-8");
 			}
-			return citiesStream;
 		}
-		citiesStream = new JSONStream(getClass().getResourceAsStream("/cities.json"));
-		return citiesStream;
+		stream = getClass().getResourceAsStream("/cities.json");
+		return new InputStreamReader(new FilterStream(stream), "UTF-8");
 	}
 	
 	private Image transportImg(String transport) {
@@ -887,7 +842,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		throw new RuntimeException("Unknown transport_type: " + transport);
 	}
 	
-	private void display(Alert a, Displayable d) {
+	void display(Alert a, Displayable d) {
 		if(d == null) {
 			display.setCurrent(a);
 			return;
@@ -911,7 +866,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		return a;
 	}
 	
-	private Alert warningAlert(String text) {
+	Alert warningAlert(String text) {
 		Alert a = new Alert("");
 		a.setType(AlertType.ERROR);
 		a.setString(text);
@@ -1089,7 +1044,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		return "%".concat(s.length() < 2 ? "0" : "").concat(s);
 	}
 	
-	private static byte[] downloadBytes(InputStream inputStream, int initialSize, int bufferSize, int expandSize) throws IOException {
+	private static byte[] readBytes(InputStream inputStream, int initialSize, int bufferSize, int expandSize) throws IOException {
 		if (initialSize <= 0) initialSize = bufferSize;
 		byte[] buf = new byte[initialSize];
 		int count = 0;
@@ -1120,7 +1075,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			hc.setRequestMethod("GET");
 			hc.getResponseCode();
 			in = hc.openInputStream();
-			return downloadBytes(in, (int) hc.getLength(), 1024, 2048);
+			return readBytes(in, (int) hc.getLength(), 1024, 2048);
 		} finally {
 			try {
 				if (in != null) in.close();
