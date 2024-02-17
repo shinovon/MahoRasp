@@ -595,21 +595,19 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				search: {
 					if(query.length() < 3) break search;
 					stream = getCitiesStream();
-					stream.assertNext('{');
+					if(stream.next() != '{')
+						throw new Exception("Cities database is corrupted");
 					while(true) {
+						while(stream.next() != '[');
 						stream.skipString();
-						stream.assertNext(':');
-						stream.assertNext('[');
-						/*String countryName = */stream.nextString();
-						stream.assertNext(',');
+						stream.skip(1);
 						while(true) {
-							stream.assertNext('[');
+							stream.skip(1);
 							String regionName = stream.nextString();
-							stream.assertNext(',');
-							stream.assertNext('{');
+							stream.skip(2);
 							while(true) {
 								String code = stream.nextString();
-								stream.assertNext(':');
+								stream.skip(1);
 								String cityName = stream.nextString();
 								if(cityName.toLowerCase().startsWith(query)/*|| (cityName + " " + regionName).toLowerCase().startsWith(query)*/) {
 									primary.addElement(new String[] {cityName, regionName, code});
@@ -620,13 +618,11 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 									break;
 								}
 							}
-							stream.assertNext(']');
+							stream.skip(1);
 							if(stream.next() != ',') {
-								stream.back();
 								break;
 							}
 						}
-						stream.assertNext(']');
 						if(stream.next() != ',') {
 							break;
 						}
@@ -657,12 +653,6 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				searchCancel = true;
 			} catch (Exception e) {
 				display(warningAlert(e.toString()), searchForm);
-			} finally {
-				if(stream != null)
-					try {
-						stream.close();
-					} catch (IOException e) {
-					}
 			}
 			break;
 		}
@@ -830,7 +820,12 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	
 	private JSONStream getCitiesStream() throws IOException {
 		if(citiesStream != null) {
-			citiesStream.close();
+			try {
+				citiesStream.reset();
+			} catch (Exception e) {
+				citiesStream.reset(getClass().getResourceAsStream("/cities.json"));
+			}
+			return citiesStream;
 		}
 		citiesStream = new JSONStream(getClass().getResourceAsStream("/cities.json"));
 		return citiesStream;
@@ -1097,7 +1092,6 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	}
 	
 	static String getUtf(String url) throws IOException {
-		System.out.println(url);
 		return new String(get(url), "UTF-8");
 	}
 	
