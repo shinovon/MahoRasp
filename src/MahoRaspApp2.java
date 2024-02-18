@@ -48,9 +48,9 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static final Command choosePointCmd = new Command("Выбрать", Command.ITEM, 1);
 
 	// команды формы результатов
-	private static final Command prevDayCmd = new Command("Пред. день", Command.SCREEN, 3);
-	private static final Command nextDayCmd = new Command("След. день", Command.SCREEN, 4);
-	private static final Command addBookmarkCmd = new Command("Добавить в закладки", Command.SCREEN, 5);
+	private static final Command addBookmarkCmd = new Command("Добавить в закладки", Command.SCREEN, 3);
+	private static final Command prevDayCmd = new Command("Пред. день", Command.SCREEN, 4);
+	private static final Command nextDayCmd = new Command("След. день", Command.SCREEN, 5);
 	private static final Command showGoneCmd = new Command("Показать ушедшие", Command.ITEM, 2);
 	private static final Command itemCmd = new Command("Подробнее", Command.ITEM, 2);
 
@@ -106,6 +106,9 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private StringItem submitBtn;
 	private ChoiceGroup showTransfers;
 
+//	private Form settingsForm;
+//	private ChoiceGroup proxyChoice;
+	
 	private Form resultForm;
 
 	private Image planeImg;
@@ -142,6 +145,9 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private boolean gpsActive;
 	static double gpslat;
 	static double gpslon;
+	
+	// настройки
+//	private static boolean proxy;
 
 	public MahoRaspApp2() {
 		midlet = this;
@@ -197,6 +203,13 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			busImg = Image.createImage("/bus.png");
 		} catch (Exception e) {
 		}
+//		try {
+//			RecordStore r = RecordStore.openRecordStore(SETTINGS_RECORDNAME, false);
+//			JSONObject j = JSON.getObject(new String(r.getRecord(1), "UTF-8"));
+//			r.closeRecordStore();
+//			proxy = j.getBoolean("proxy", proxy);
+//		} catch (Exception e) {
+//		}
 		display(mainForm);
 	}
 
@@ -253,6 +266,22 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			return;
 		}
 		if(c == backCmd) {
+//			if(settingsForm == d) {
+//				proxy = proxyChoice.isSelected(0);
+//				try {
+//					RecordStore.deleteRecordStore(SETTINGS_RECORDNAME);
+//				} catch (Exception e) {
+//				}
+//				try {
+//					JSONObject j = new JSONObject();
+//					j.put("proxy", proxy);
+//					byte[] b = j.toString().getBytes("UTF-8");
+//					RecordStore r = RecordStore.openRecordStore(SETTINGS_RECORDNAME, true);
+//					r.addRecord(b, 0, b.length);
+//					r.closeRecordStore();
+//				} catch (Exception e) {
+//				}
+//			} else
 			if(resultForm == d) {
 				items.clear();
 				resultForm = null;
@@ -274,9 +303,14 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			run(RUN_REQUEST);
 			return;
 		}
-//		if(c == searchCmd) {
-//			if(running) return;
-//			run(RUN_SEARCH);
+//		if(c == settingsCmd) {
+//			settingsForm = new Form("Настройки");
+//			settingsForm.addCommand(backCmd);
+//			settingsForm.setCommandListener(this);
+//			proxyChoice = new ChoiceGroup(null, Choice.MULTIPLE, new String[] { "Проксировать запросы" }, null);
+//			proxyChoice.setSelectedIndex(0, proxy);
+//			settingsForm.append(proxyChoice);
+//			display(settingsForm);
 //			return;
 //		}
 		if(c == gpsCmd) {
@@ -461,6 +495,18 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		if(item == searchField) { // выполнять поиск при изменениях в поле ввода
 			if(running) return;
 			run(RUN_SEARCH);
+		}
+		if(item == searchChoice) {
+			if(searchChoice.getSelectedIndex() != -1) {
+				if(!searchCancel) return;
+				searchForm.addCommand(MahoRaspApp2.doneCmd);
+				searchCancel = false;
+				return;
+			}
+			if(searchCancel) return;
+			searchForm.removeCommand(MahoRaspApp2.doneCmd);
+			searchCancel = true;
+			return;
 		}
 	}
 	
@@ -712,7 +758,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		resultForm.append(titleItem);
 		
 		StringItem left = new StringItem(null, "");
-		left.setLayout(Item.LAYOUT_LEFT | Item.LAYOUT_NEWLINE_BEFORE);
+		left.setLayout(Item.LAYOUT_LEFT | Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER);
 		int idx = resultForm.append(left);
 		
 		JSONArray segments = result.getArray("segments");
@@ -1087,12 +1133,15 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			}
 		}
 	}
-	
+
 	static String getUtf(String url) throws IOException {
 		return new String(get(url), "UTF-8");
 	}
-	
+
 	static JSONObject api(String url) throws Exception {
+//		url = "http://api.rasp.yandex.net/v3.0/" + url + (!url.endsWith("?") ? "&" : "") + "apikey=" + APIKEY + "&format=json&lang=ru_RU";
+//		if (proxy)
+//			url = "http://nnp.nnchan.ru:80/hproxy.php?u=" + url(url);
 		String r = getUtf("http://api.rasp.yandex.net/v3.0/" + url + (!url.endsWith("?") ? "&" : "") + "apikey=" + APIKEY + "&format=json&lang=ru_RU");
 		JSONObject j = JSON.getObject(r);
 		if(j.has("error")) {

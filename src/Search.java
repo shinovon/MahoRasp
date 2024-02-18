@@ -12,6 +12,7 @@ public class Search implements Runnable {
 	int loadingIdx;
 
 	public void run() {
+		// TODO поиск по алфавиту
 		app.searching = true;
 		InputStreamReader r = null;
 		s: {
@@ -52,6 +53,7 @@ public class Search implements Runnable {
 					}
 				}
 				if(app.searchForm == null || cancel) break s;
+				app.searchChoice.setLabel("");
 				for(Enumeration e = items.elements(); e.hasMoreElements(); ) {
 					if(app.searchChoice.size() > 10) break;
 					String[] s = (String[]) e.nextElement();
@@ -70,7 +72,6 @@ public class Search implements Runnable {
 				app.searchForm.removeCommand(MahoRaspApp2.doneCmd);
 	//			searchForm.addCommand(cancelCmd);
 				app.searchCancel = true;
-				app.searchChoice.setLabel("");
 			} catch (Exception e) {
 				if(cancel) break s;
 				e.printStackTrace();
