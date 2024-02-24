@@ -770,6 +770,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		for(int i = 0; i < size; i++) {
 			JSONObject seg = segments.getObject(i);
 			Calendar departure = parseDate(seg.getString("departure"));
+			// TODO: учитывать таймзоны
 			if(!showGone && oneDay(now, departure) && departure.before(now)) {
 				goneCount++;
 				continue;

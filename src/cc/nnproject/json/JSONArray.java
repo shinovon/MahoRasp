@@ -37,9 +37,21 @@ public class JSONArray extends AbstractJSON {
 		elements = new Object[size];
 	}
 
+	/**
+	 * @deprecated Doesn't adapt nested elements
+	 */
 	public JSONArray(Vector vector) {
 		elements = new Object[count = vector.size()];
 		vector.copyInto(elements);
+	}
+
+	/**
+	 * @deprecated Compatibility with org.json
+	 */
+	public JSONArray(String str) {
+		JSONArray tmp = JSON.getArray(str); // FIXME
+		elements = tmp.elements;
+		count = tmp.count;
 	}
 
 	public Object get(int index) throws JSONException {
@@ -49,7 +61,7 @@ public class JSONArray extends AbstractJSON {
 		try {
 			Object o = elements[index];
 			if (o instanceof JSONString)
-				o = elements[index] = JSON.parseJSON(o.toString());
+				o = elements[index] = JSON.parseJSON(((JSONString) o).str);
 			if (o == JSON.json_null)
 				return null;
 			return o;
@@ -71,12 +83,18 @@ public class JSONArray extends AbstractJSON {
 	}
 	
 	public String getString(int index) throws JSONException {
-		return String.valueOf(get(index));
+		Object o = get(index);
+		if (o == null || o instanceof String)
+			return (String) o;
+		return String.valueOf(o);
 	}
 	
 	public String getString(int index, String def) {
 		try {
-			return String.valueOf(get(index));
+			Object o = get(index);
+			if (o == null || o instanceof String)
+				return (String) o;
+			return String.valueOf(o);
 		} catch (Exception e) {
 			return def;
 		}
@@ -127,7 +145,7 @@ public class JSONArray extends AbstractJSON {
 	}
 	
 	public int getInt(int index) throws JSONException {
-		return (int) JSON.getLong(get(index));
+		return JSON.getInt(get(index));
 	}
 	
 	public int getInt(int index, int def) {
@@ -191,6 +209,9 @@ public class JSONArray extends AbstractJSON {
 		return elements[index] == JSON.json_null;
 	}
 	
+	/**
+	 * @deprecated
+	 */
 	public void add(Object object) {
 		addElement(JSON.getJSON(object));
 	}
@@ -211,6 +232,13 @@ public class JSONArray extends AbstractJSON {
 		addElement(new Boolean(b));
 	}
 	
+	public void add(AbstractJSON json) {
+		addElement(json);
+	}
+
+	/**
+	 * @deprecated
+	 */
 	public void set(int index, Object object) {
 		if (index < 0 || index >= count) {
 			throw new JSONException("Index out of bounds: " + index);
@@ -246,6 +274,16 @@ public class JSONArray extends AbstractJSON {
 		elements[index] = new Boolean(b);
 	}
 	
+	public void set(int index, AbstractJSON json) {
+		if (index < 0 || index >= count) {
+			throw new JSONException("Index out of bounds: " + index);
+		}
+		elements[index] = JSON.getJSON(json);
+	}
+	
+	/**
+	 * @deprecated
+	 */
 	public void put(int index, Object object) {
 		insertElementAt(JSON.getJSON(object), index);
 	}
@@ -264,6 +302,10 @@ public class JSONArray extends AbstractJSON {
 
 	public void put(int index, boolean b) {
 		insertElementAt(new Boolean(b), index);
+	}
+	
+	public void put(int index, AbstractJSON json) {
+		insertElementAt(json, index);
 	}
 	
 	public boolean has(Object object) {
@@ -330,10 +372,7 @@ public class JSONArray extends AbstractJSON {
 	}
 	
 	public boolean equals(Object obj) {
-		if (this == obj || super.equals(obj)) {
-			return true;
-		}
-		return similar(obj);
+		return this == obj || super.equals(obj) || similar(obj);
 	}
 	
 	public boolean similar(Object obj) {
@@ -405,7 +444,7 @@ public class JSONArray extends AbstractJSON {
 		while (i < size) {
 			Object v = elements[i];
 			if (v instanceof JSONString) {
-				v = elements[i] = JSON.parseJSON(v.toString());
+				v = elements[i] = JSON.parseJSON(((JSONString) v).str);
 			}
 			if (v instanceof AbstractJSON) {
 				s.append(((AbstractJSON) v).format(l + 1));
@@ -440,7 +479,7 @@ public class JSONArray extends AbstractJSON {
 			public Object nextElement() {
 				Object o = elements[i];
 				if (o instanceof JSONString)
-					o = elements[i] = JSON.parseJSON(o.toString());
+					o = elements[i] = JSON.parseJSON(((JSONString) o).str);
 				i++;
 				return o == JSON.json_null ? null : o;
 			}
@@ -464,9 +503,8 @@ public class JSONArray extends AbstractJSON {
 		Vector copy = new Vector(size);
 		for (int i = 0; i < size; i++) {
 			Object o = elements[i];
-			if (o instanceof JSONString) {
-				o = elements[i] = JSON.parseJSON(o.toString());
-			}
+			if (o instanceof JSONString)
+				o = elements[i] = JSON.parseJSON(((JSONString) o).str);
 			if (o instanceof JSONObject) {
 				o = ((JSONObject) o).toTable();
 			} else if (o instanceof JSONArray) {
@@ -477,7 +515,7 @@ public class JSONArray extends AbstractJSON {
 		return copy;
 	}
 
-	private void addElement(Object object) {
+	void addElement(Object object) {
 		if (object == this) throw new JSONException();
 		if (count == elements.length) grow();
 		elements[count++] = object;
@@ -485,7 +523,7 @@ public class JSONArray extends AbstractJSON {
 	
 	private void insertElementAt(Object object, int index) {
 		if (object == this) throw new JSONException();
-		if (index < 0 || index >= count) {
+		if (index < 0 || index > count) {
 			throw new JSONException("Index out of bounds: " + index);
 		}
 		if (count == elements.length) grow();
@@ -493,11 +531,12 @@ public class JSONArray extends AbstractJSON {
 		if (size > 0)
 			System.arraycopy(elements, index, elements, index + 1, size);
 		elements[index] = object;
-		size++;
+		count++;
 	}
 	
 	private int _indexOf(Object object, int start) {
 		for (int i = 0; i < count; i++) {
+			if (elements[i] instanceof JSONString) elements[i] = JSON.parseJSON(((JSONString) elements[i]).str);
 			if (object.equals(elements[i])) return i;
 		}
 		return -1;
