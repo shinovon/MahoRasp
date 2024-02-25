@@ -516,7 +516,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			((List)d).removeCommand(removeBookmarkCmd);
 			((List)d).removeCommand(moveBookmarkCmd);
 			((List)d).removeCommand(backCmd);
-			((List)d).addCommand(doneCmd);
+			((List)d).addCommand(cancelCmd);
 			return;
 		}
 		if(c == List.SELECT_COMMAND) { // выбрана закладка в списке
@@ -534,8 +534,9 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 					JSONObject bm = bookmarks.getObject(j);
 					bookmarks.remove(j);
 					bookmarks.put(i, bm);
-					((List)d).insert(i, ((List)d).getString(j), null);
-					((List)d).delete(j + (j > i ? 1 : 0));
+					String s = ((List)d).getString(j);
+					((List)d).delete(j);
+					((List)d).insert(i, s, null);
 				}
 				return;
 			}
