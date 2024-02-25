@@ -63,6 +63,8 @@ public class JSONObject extends AbstractJSON {
 		throw new JSONException("No value for name: " + name);
 	}
 	
+	// unused methods should be removed by proguard shrinking
+	
 	public Object get(String name, Object def) {
 		if (!has(name)) return def;
 		try {
@@ -216,6 +218,14 @@ public class JSONObject extends AbstractJSON {
 	public void put(String name, Object obj) {
 		table.put(name, JSON.getJSON(obj));
 	}
+	
+	public void put(String name, AbstractJSON json) {
+		table.put(name, json);
+	}
+	
+	public void put(String name, String s) {
+		table.put(name, s);
+	}
 
 	public void put(String name, int i) {
 		table.put(name, new Integer(i));
@@ -231,14 +241,6 @@ public class JSONObject extends AbstractJSON {
 
 	public void put(String name, boolean b) {
 		table.put(name, new Boolean(b));
-	}
-	
-	public void put(String name, AbstractJSON json) {
-		table.put(name, json);
-	}
-	
-	void _put(String name, Object obj) {
-		table.put(name, obj);
 	}
 	
 	public boolean hasValue(Object object) {
@@ -383,13 +385,13 @@ public class JSONObject extends AbstractJSON {
 		JSONArray array = new JSONArray(table.size());
 		Enumeration keys = table.keys();
 		while (keys.hasMoreElements()) {
-			array.add(keys.nextElement());
+			array.addElement(keys.nextElement());
 		}
 		return array;
 	}
 	
 	/**
-	 * @deprecated
+	 * @deprecated Use {@link JSONObject#toTable()} instead
 	 */
 	public Hashtable getTable() {
 		return table;
@@ -412,5 +414,12 @@ public class JSONObject extends AbstractJSON {
 		}
 		return copy;
 	}
+	
+	void _put(String name, Object obj) {
+		table.put(name, obj);
+	}
+	
+	// TODO: Enumeration elements()
+	// TODO: String keyOf(Object)
 
 }

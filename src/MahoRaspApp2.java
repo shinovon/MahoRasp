@@ -5,6 +5,7 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.Hashtable;
+import java.util.TimeZone;
 import java.util.Vector;
 
 import javax.microedition.io.Connector;
@@ -42,7 +43,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static final Command exitCmd = new Command("Выход", Command.EXIT, 1);
 	private static final Command backCmd = new Command("Назад", Command.BACK, 1);
 	private static final Command bookmarksCmd = new Command("Закладки", Command.SCREEN, 3);
-//	private static final Command settingsCmd = new Command("Настройки", Command.SCREEN, 4);
+	private static final Command settingsCmd = new Command("Настройки", Command.SCREEN, 4);
 	private static final Command aboutCmd = new Command("О программе", Command.SCREEN, 5);
 	private static final Command submitCmd = new Command("Искать", Command.ITEM, 2);
 	private static final Command choosePointCmd = new Command("Выбрать", Command.ITEM, 1);
@@ -89,7 +90,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	};
 	
 	// Константы названий RecordStore
-//	private static final String SETTINGS_RECORDNAME = "mahoRsets";
+	private static final String SETTINGS_RECORDNAME = "mahoRsets";
 	private static final String BOOKMARKS_RECORDNAME = "mahoRbm";
 
 	public static MahoRaspApp2 midlet;
@@ -106,7 +107,9 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private StringItem submitBtn;
 	private ChoiceGroup showTransfers;
 
-//	private Form settingsForm;
+	private Form settingsForm;
+	private TextField timezoneField;
+	private ChoiceGroup timezoneChoice;
 //	private ChoiceGroup proxyChoice;
 	
 	private Form resultForm;
@@ -147,6 +150,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	static double gpslon;
 	
 	// настройки
+	private static String timezone;
+	private static int timezoneMode;
 //	private static boolean proxy;
 
 	public MahoRaspApp2() {
@@ -156,7 +161,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		mainForm = new Form("MahoRasp");
 		mainForm.addCommand(exitCmd);
 		mainForm.addCommand(bookmarksCmd);
-//		mainForm.addCommand(settingsCmd);
+		mainForm.addCommand(settingsCmd);
 		mainForm.addCommand(aboutCmd);
 		mainForm.setCommandListener(this);
 		transportChoice = new ChoiceGroup("Тип транспорта", Choice.POPUP, TRANSPORT_NAMES, null);
@@ -201,15 +206,19 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			trainImg = Image.createImage("/train.png");
 			suburbanImg = Image.createImage("/suburban.png");
 			busImg = Image.createImage("/bus.png");
-		} catch (Exception e) {
-		}
-//		try {
-//			RecordStore r = RecordStore.openRecordStore(SETTINGS_RECORDNAME, false);
-//			JSONObject j = JSON.getObject(new String(r.getRecord(1), "UTF-8"));
-//			r.closeRecordStore();
+		} catch (Exception e) {}
+		try {
+			int i = TimeZone.getDefault().getRawOffset() / 60000;
+			timezone = (i < 0 ? '-' : '+') + n(Math.abs(i / 60)) + ':' + n(Math.abs(i % 60));
+		} catch (Exception e) {}
+		try {
+			RecordStore r = RecordStore.openRecordStore(SETTINGS_RECORDNAME, false);
+			JSONObject j = JSON.getObject(new String(r.getRecord(1), "UTF-8"));
+			r.closeRecordStore();
+			timezone = j.getString("tz", timezone);
+			timezoneMode = j.getInt("tzm", timezoneMode);
 //			proxy = j.getBoolean("proxy", proxy);
-//		} catch (Exception e) {
-//		}
+		} catch (Exception e) {}
 		display(mainForm);
 	}
 
@@ -266,23 +275,24 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			return;
 		}
 		if(c == backCmd) {
-//			if(settingsForm == d) {
+			if(settingsForm == d) {
 //				proxy = proxyChoice.isSelected(0);
-//				try {
-//					RecordStore.deleteRecordStore(SETTINGS_RECORDNAME);
-//				} catch (Exception e) {
-//				}
-//				try {
-//					JSONObject j = new JSONObject();
+				try {
+					RecordStore.deleteRecordStore(SETTINGS_RECORDNAME);
+				} catch (Exception e) {
+				}
+				try {
+					JSONObject j = new JSONObject();
+					j.put("tz", timezone);
+					j.put("tzm", timezoneMode);
 //					j.put("proxy", proxy);
-//					byte[] b = j.toString().getBytes("UTF-8");
-//					RecordStore r = RecordStore.openRecordStore(SETTINGS_RECORDNAME, true);
-//					r.addRecord(b, 0, b.length);
-//					r.closeRecordStore();
-//				} catch (Exception e) {
-//				}
-//			} else
-			if(resultForm == d) {
+					byte[] b = j.toString().getBytes("UTF-8");
+					RecordStore r = RecordStore.openRecordStore(SETTINGS_RECORDNAME, true);
+					r.addRecord(b, 0, b.length);
+					r.closeRecordStore();
+				} catch (Exception e) {
+				}
+			} else if(resultForm == d) {
 				items.clear();
 				resultForm = null;
 			} else if(resultForm != null && d instanceof Form) {
@@ -303,16 +313,24 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			run(RUN_REQUEST);
 			return;
 		}
-//		if(c == settingsCmd) {
-//			settingsForm = new Form("Настройки");
-//			settingsForm.addCommand(backCmd);
-//			settingsForm.setCommandListener(this);
+		if(c == settingsCmd) {
+			settingsForm = new Form("Настройки");
+			settingsForm.addCommand(backCmd);
+			settingsForm.setCommandListener(this);
+			timezoneField = new TextField("Часовой пояс", timezone, 10, TextField.ANY);
+			settingsForm.append(timezoneField);
+			timezoneChoice = new ChoiceGroup("Время", Choice.POPUP, new String[] {
+					"Местное время",
+					"По указанному часовому поясу",
+					}, null);
+			timezoneChoice.setSelectedIndex(timezoneMode, true);
+			settingsForm.append(timezoneChoice);
 //			proxyChoice = new ChoiceGroup(null, Choice.MULTIPLE, new String[] { "Проксировать запросы" }, null);
 //			proxyChoice.setSelectedIndex(0, proxy);
 //			settingsForm.append(proxyChoice);
-//			display(settingsForm);
-//			return;
-//		}
+			display(settingsForm);
+			return;
+		}
 		if(c == gpsCmd) {
 			if(gpsActive) return;
 			gpsActive = true;
@@ -572,8 +590,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 							if(n.has("departure_terminal") && (m = n.getString("departure_terminal")) != null) {
 								d = "Терминал: " + m + "\n";
 							}
-							Calendar departure = parseDate(seg.getString("departure"));
-							Calendar arrival = parseDate(seg.getString("arrival"));
+							Calendar departure = getLocalizedDate(seg.getString("departure"));
+							Calendar arrival = getLocalizedDate(seg.getString("arrival"));
 							StringItem s = new StringItem(null,
 									"Отправление: " + point(n.getObject("from")) + "\n" +
 									shortDate(departure) + " " + time(departure) + "\n" + d + "\n" +
@@ -615,8 +633,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				if((m = seg.getNullableString("departure_terminal")) != null && m.length() > 0) {
 					d = "Терминал: " + m + "\n";
 				}
-				Calendar departure = parseDate(seg.getString("departure"));
-				Calendar arrival = parseDate(seg.getString("arrival"));
+				Calendar departure = getLocalizedDate(seg.getString("departure"));
+				Calendar arrival = getLocalizedDate(seg.getString("arrival"));
 				StringItem s = new StringItem(null,
 						"Отправление:\n" + point(seg.getObject("from")) + "\n" +
 						shortDate(departure) + " " + time(departure) + "\n" + d + "\n" +
@@ -748,8 +766,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private void parseResults() {
 		Calendar cal = Calendar.getInstance();
 		cal.setTime(dateField.getDate());
-		Calendar now = Calendar.getInstance();
-		now.setTime(new Date());
+		long time = System.currentTimeMillis();
+		Calendar now = getLocalizedTime(time);
 		JSONObject search = result.getObject("search");
 		String title = search.getObject("from").getString("title") + " - " + search.getObject("to").getString("title");
 		resultTitle = title;
@@ -769,13 +787,12 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		int goneCount = 0;
 		for(int i = 0; i < size; i++) {
 			JSONObject seg = segments.getObject(i);
-			Calendar departure = parseDate(seg.getString("departure"));
-			// TODO: учитывать таймзоны
-			if(!showGone && oneDay(now, departure) && departure.before(now)) {
+			Calendar departure = getLocalizedDate(seg.getString("departure"));
+			if(!showGone && oneDay(now, departure) && parseDateGMT(seg.getString("departure")) < time) {
 				goneCount++;
 				continue;
 			}
-			Calendar arrival = parseDate(seg.getString("arrival"));
+			Calendar arrival = getLocalizedDate(seg.getString("arrival"));
 			String r = "";
 			if(seg.getBoolean("has_transfers")) {
 				JSONArray types = seg.getArray("transport_types");
@@ -967,6 +984,42 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		}
 		return c;
 	}
+	
+	static Calendar getLocalizedTime(long time) {
+		Calendar c = Calendar.getInstance();
+		c.setTime(new Date(time - c.getTimeZone().getRawOffset() + parseTimeZone(timezone)));
+		return c;
+	}
+	
+	static Calendar getLocalizedDate(String date) {
+		if(timezoneMode == 0)
+			return parseDate(date);
+		Calendar c = parseDate(date);
+		c.setTime(new Date(c.getTime().getTime() - parseTimeZone(date) + parseTimeZone(timezone)));
+		return c;
+	}
+	
+	static long parseDateGMT(String date) {
+		Calendar c = parseDate(date);
+		return c.getTime().getTime() + c.getTimeZone().getRawOffset() - parseTimeZone(date);
+	}
+
+	static int parseTimeZone(String date) {
+		int i = date.indexOf('+');
+		boolean m = false;
+		if(i == -1) {
+			i = date.indexOf('-');
+			m = true;
+		}
+		if(i != -1) {
+			date = date.substring(i + 1);
+			int offset = date.indexOf(':');
+			offset = (Integer.parseInt(date.substring(i + 1, offset)) * 3600000) +
+					(Integer.parseInt(date.substring(offset + 1)) * 60000);
+			return m ? -offset : offset;
+		}
+		return 0;
+	}
 
 	static String shortDate(Calendar c) {
 		if(c == null) return "";
@@ -977,10 +1030,6 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		if(c == null) return "";
 		//return c.get(Calendar.DAY_OF_MONTH) + " " + localizeMonthWithCase(c.get(Calendar.MONTH)) + " " +
 		return n(c.get(Calendar.HOUR_OF_DAY)) + ":" + n(c.get(Calendar.MINUTE));
-	}
-	
-	static long timestamp(String date) {
-		return parseDate(date).getTime().getTime();
 	}
 	
 	static boolean oneDay(Calendar a, Calendar b) {
