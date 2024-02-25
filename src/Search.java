@@ -25,16 +25,12 @@ public class Search implements Runnable {
 				search: {
 					if(query.length() < 3) break search;
 					r = reader = app.openCitiesStream();
-					if(reader.read() != '[')
+					if(reader.read() != 'm' || reader.read() != '[')
 						throw new Exception("Cities database is corrupted");
 					while(!cancel) {
-						reader.skip(2);
 						String regionName = nextString();
-						reader.skip(2);
 						for(;;) {
-							reader.skip(1);
 							String code = nextString();
-							reader.skip(2);
 							String cityName = nextString();
 							if(cityName.toLowerCase().startsWith(query)) {
 								app.searchChoice.append(cityName + ", " + regionName, null);
@@ -46,7 +42,6 @@ public class Search implements Runnable {
 								break;
 							}
 						}
-						reader.skip(1);
 						if(reader.read() != ',') {
 							break;
 						}
@@ -92,22 +87,9 @@ public class Search implements Runnable {
 	
 	String nextString() throws IOException {
 		StringBuffer sb = new StringBuffer();
-		char l = 0;
-		while(true) {
-			char c = (char) reader.read();
-			if(c == '\\' && l != '\\') {
-				l = c;
-				continue;
-			}
-			if(c == 'u' && l == '\\') {
-				char[] chars = new char[4];
-				reader.read(chars);
-				sb.append(l = (char) Integer.parseInt(new String(chars), 16));
-				continue;
-			}
-			if(c == 0 || (l != '\\' && c == '"')) break;
+		char c;
+		while((c = (char) reader.read()) != '"') {
 			sb.append(c);
-			l = c;
 		}
 		return sb.toString();
 	}

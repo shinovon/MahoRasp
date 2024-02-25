@@ -865,11 +865,11 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				try {
 					stream.close();
 				} catch (IOException e2) {}
-				stream = getClass().getResourceAsStream("/cities.json");
+				stream = getClass().getResourceAsStream("/cities");
 				return new InputStreamReader(new FilterStream(stream), "UTF-8");
 			}
 		}
-		stream = getClass().getResourceAsStream("/cities.json");
+		stream = getClass().getResourceAsStream("/cities");
 		return new InputStreamReader(new FilterStream(stream), "UTF-8");
 	}
 	
