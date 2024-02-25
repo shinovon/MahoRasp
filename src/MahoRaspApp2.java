@@ -61,7 +61,9 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static final Command gpsCmd = new Command("Ближайший город", Command.ITEM, 2);
 //	private static final Command searchCmd = new Command("Поиск", Command.ITEM, 2);
 
+	// закладки
 	private static final Command removeBookmarkCmd = new Command("Удалить", Command.ITEM, 2);
+	private static final Command moveBookmarkCmd = new Command("Переместить", Command.ITEM, 3);
 	
 	private static final Command hyperlinkCmd = new Command("Открыть", Command.ITEM, 2);
 	
@@ -143,6 +145,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	boolean searching;
 	
 	private JSONArray bookmarks;
+	private int movingBookmark = -1;
 
 	private Alert gpsDialog;
 	private boolean gpsActive;
@@ -202,16 +205,19 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		started = true;
 		display = Display.getDisplay(this);
 		try {
+			// загрузка иконок
 			planeImg = Image.createImage("/plane.png");
 			trainImg = Image.createImage("/train.png");
 			suburbanImg = Image.createImage("/suburban.png");
 			busImg = Image.createImage("/bus.png");
 		} catch (Exception e) {}
 		try {
+			// определение таймзоны системы
 			int i = TimeZone.getDefault().getRawOffset() / 60000;
 			timezone = (i < 0 ? '-' : '+') + n(Math.abs(i / 60)) + ':' + n(Math.abs(i % 60));
 		} catch (Exception e) {}
 		try {
+			// загрузка настроек
 			RecordStore r = RecordStore.openRecordStore(SETTINGS_RECORDNAME, false);
 			JSONObject j = JSON.getObject(new String(r.getRecord(1), "UTF-8"));
 			r.closeRecordStore();
@@ -223,13 +229,13 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	}
 
 	public void commandAction(Command c, Item i) {
-		if(c == itemCmd) {
+		if(c == itemCmd) { // выбран рейс, показать его детали
 			display(loadingAlert("Загрузка"), null);
 			selectedItem = ((Integer) items.get(i)).intValue();
 			run(2);
 			return;
 		}
-		if(c == choosePointCmd) {
+		if(c == choosePointCmd) { // начать выбор точки
 			choosing = i == fromBtn ? 1 : 2;
 			// TODO выбор станции
 			searchForm = new Form("Выбор города");
@@ -252,14 +258,14 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			display(searchForm);
 			return;
 		}
-		if(c == showGoneCmd) {
+		if(c == showGoneCmd) { // показать ушедшие
 			if(running) return;
 			showGone = true;
 			display(loadingAlert("Загрузка"));
 			run(RUN_UPDATE_RESULT);
 			return;
 		}
-		if(c == hyperlinkCmd) {
+		if(c == hyperlinkCmd) { // открыть гиперссылку из формы "о программе"
 			try {
 				if(platformRequest("http://" + ((StringItem) i).getText()))
 					notifyDestroyed();
@@ -276,6 +282,9 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		}
 		if(c == backCmd) {
 			if(settingsForm == d) {
+				// сохранить настройки
+				timezone = timezoneField.getString();
+				timezoneMode = timezoneChoice.getSelectedIndex();
 //				proxy = proxyChoice.isSelected(0);
 				try {
 					RecordStore.deleteRecordStore(SETTINGS_RECORDNAME);
@@ -293,16 +302,18 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				} catch (Exception e) {
 				}
 			} else if(resultForm == d) {
+				// очистить результаты перед выходом на главную форму
 				items.clear();
 				resultForm = null;
 			} else if(resultForm != null && d instanceof Form) {
+				// возврат на список результатов из формы деталей маршрута
 				display(resultForm);
 				return;
 			}
 			display(mainForm);
 			return;
 		}
-		if(c == submitCmd) {
+		if(c == submitCmd) { // поиск маршрутов
 			if(running) return;
 			if(from == null || to == null) {
 				display(warningAlert("Не выбран один из пунктов"), null);
@@ -319,7 +330,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			settingsForm.setCommandListener(this);
 			timezoneField = new TextField("Часовой пояс", timezone, 10, TextField.ANY);
 			settingsForm.append(timezoneField);
-			timezoneChoice = new ChoiceGroup("Время", Choice.POPUP, new String[] {
+			timezoneChoice = new ChoiceGroup("Отображение времени", Choice.POPUP, new String[] {
 					"Местное время",
 					"По указанному часовому поясу",
 					}, null);
@@ -331,7 +342,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			display(settingsForm);
 			return;
 		}
-		if(c == gpsCmd) {
+		if(c == gpsCmd) { // выбрать ближайший город
 			if(gpsActive) return;
 			gpsActive = true;
 			gpsDialog = new Alert("", "Ожидание геолокации", null, null);
@@ -349,7 +360,15 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			return;
 		}
 		if(c == cancelCmd) {
-			if(d == gpsDialog) {
+			if(d instanceof List) { // отменено перемещение закладки
+				movingBookmark = -1;
+				((List)d).removeCommand(cancelCmd);
+				((List)d).addCommand(removeBookmarkCmd);
+				((List)d).addCommand(moveBookmarkCmd);
+				((List)d).addCommand(backCmd);
+				return;
+			}
+			if(d == gpsDialog) { // отменен диалог гпс
 				gpsActive = false;
 				try {
 					GPS.reset();
@@ -357,10 +376,11 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				display(searchForm);
 				return;
 			}
+			// отменен поиск города
 			cancelChoice();
 			return;
 		}
-		if(c == doneCmd) {
+		if(c == doneCmd) { // выбрана точка
 			int i = searchChoice.getSelectedIndex();
 			if(i == -1) { // если список пустой то отмена
 				cancelChoice();
@@ -409,7 +429,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			display(f);
 			return;
 		}
-		if(c == prevDayCmd) {
+		if(c == prevDayCmd) { // предыдущий день в форме результатов
 			if(running) return;
 			Date date = dateField.getDate();
 			date.setTime(date.getTime()-24*60*60*1000);
@@ -418,7 +438,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			run(RUN_REQUEST);
 			return;
 		}
-		if(c == nextDayCmd) {
+		if(c == nextDayCmd) { // следующий день в форме результатов
 			if(running) return;
 			Date date = dateField.getDate();
 			date.setTime(date.getTime()+24*60*60*1000);
@@ -427,13 +447,13 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			run(RUN_REQUEST);
 			return;
 		}
-		if(c == bookmarksCmd) {
+		if(c == bookmarksCmd) { // открыть список закладок
 			if(running) return;
 			display(loadingAlert("Загрузка"));
 			run(RUN_BOOKMARKS_SCREEN);
 			return;
 		}
-		if(c == addBookmarkCmd) {
+		if(c == addBookmarkCmd) { // добавить маршрут город-город в закладки
 			if(from == null || to == null) {
 				display(warningAlert("Не выбран один из пунктов"));
 				return;
@@ -481,17 +501,45 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			display(infoAlert("Закладка добавлена"), null);
 			return;
 		}
-		if(c == removeBookmarkCmd) {
-			if(bookmarks == null) return;
+		if(c == removeBookmarkCmd) { // удалить закладку (контекстка)
+			if(bookmarks == null || movingBookmark > -1) return;
 			int idx;
 			((List)d).delete(idx = ((List)d).getSelectedIndex());
 			bookmarks.remove(idx);
 			display(infoAlert("Закладка удалена"), null);
 			return;
 		}
-		if(c == List.SELECT_COMMAND) { // выбрана закладка
+		if(c == moveBookmarkCmd) { // начать перемещение закладки (контекстка)
 			if(bookmarks == null) return;
-			JSONObject bm = bookmarks.getObject(((List)d).getSelectedIndex());
+			movingBookmark = ((List)d).getSelectedIndex();
+			if(movingBookmark == -1) return;
+			((List)d).removeCommand(removeBookmarkCmd);
+			((List)d).removeCommand(moveBookmarkCmd);
+			((List)d).removeCommand(backCmd);
+			((List)d).addCommand(doneCmd);
+			return;
+		}
+		if(c == List.SELECT_COMMAND) { // выбрана закладка в списке
+			if(bookmarks == null) return;
+			int i = ((List)d).getSelectedIndex();
+			// завершить перемещение закладки
+			if(movingBookmark > -1) {
+				int j = movingBookmark;
+				movingBookmark = -1;
+				if(j != i) {
+					((List)d).removeCommand(cancelCmd);
+					((List)d).addCommand(removeBookmarkCmd);
+					((List)d).addCommand(moveBookmarkCmd);
+					((List)d).addCommand(backCmd);
+					JSONObject bm = bookmarks.getObject(j);
+					bookmarks.remove(j);
+					bookmarks.put(i, bm);
+					((List)d).insert(i, ((List)d).getString(j), null);
+					((List)d).delete(j + (j > i ? 1 : 0));
+				}
+				return;
+			}
+			JSONObject bm = bookmarks.getObject(i);
 			switch(bm.getInt("t")) {
 			case BOOKMARK_CITIES:
 //			case BOOKMARK_STATIONS:
@@ -558,13 +606,13 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			display(resultForm);
 			break;
 		}
-		case RUN_ITEM_DETAILS: { // показ подробнее
+		case RUN_ITEM_DETAILS: { // показ деталей рейса
 			Form f = new Form("");
 			f.addCommand(backCmd);
 			f.setCommandListener(this);
 			JSONObject seg = result.getArray("segments").getObject(selectedItem);
 			
-			if(seg.getBoolean("has_transfers")) {
+			if(seg.getBoolean("has_transfers")) { // есть пересадки
 				JSONArray types = seg.getArray("transport_types");
 				String title = seg.getObject("departure_from").getString("title") + " - " + seg.getObject("arrival_to").getString("title");
 				f.setTitle(title);
@@ -590,13 +638,15 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 							if(n.has("departure_terminal") && (m = n.getString("departure_terminal")) != null) {
 								d = "Терминал: " + m + "\n";
 							}
-							Calendar departure = getLocalizedDate(seg.getString("departure"));
-							Calendar arrival = getLocalizedDate(seg.getString("arrival"));
+							String dep, arr;
+							Calendar departure = getLocalizedDate(dep = seg.getString("departure"));
+							Calendar arrival = getLocalizedDate(arr = seg.getString("arrival"));
+							boolean tzDiffer = parseTimeZone(dep) != parseTimeZone(arr) && timezoneMode == 0;
 							StringItem s = new StringItem(null,
 									"Отправление: " + point(n.getObject("from")) + "\n" +
-									shortDate(departure) + " " + time(departure) + "\n" + d + "\n" +
+									shortDate(departure) + " " + time(departure) + (tzDiffer ? " (" + getTimeZoneStr(dep) + ")" : "") + "\n" + d + "\n" +
 									"Прибытие: " + point(n.getObject("to")) + "\n" +
-									shortDate(arrival) + " " + time(arrival) + "\n" +
+									shortDate(arrival) + " " + time(arrival) + (tzDiffer ? " (" + getTimeZoneStr(arr) + ")" : "") + "\n" +
 									(n.has("duration") ? (duration(n.getInt("duration")) + "\n") : "") + "\n"
 									);
 							s.setFont(smallfont);
@@ -617,7 +667,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 						}
 					}
 				}
-			} else {
+			} else { // нет пересадок
 				JSONObject thread = seg.getObject("thread");
 				f.append(new ImageItem(null, transportImg(thread.getString("transport_type")), Item.LAYOUT_LEFT, null));
 				String title = thread.getString("number") + " " + thread.getString("title");
@@ -633,13 +683,15 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				if((m = seg.getNullableString("departure_terminal")) != null && m.length() > 0) {
 					d = "Терминал: " + m + "\n";
 				}
-				Calendar departure = getLocalizedDate(seg.getString("departure"));
-				Calendar arrival = getLocalizedDate(seg.getString("arrival"));
+				String dep, arr;
+				Calendar departure = getLocalizedDate(dep = seg.getString("departure"));
+				Calendar arrival = getLocalizedDate(arr = seg.getString("arrival"));
+				boolean tzDiffer = parseTimeZone(dep) != parseTimeZone(arr) && timezoneMode == 0;
 				StringItem s = new StringItem(null,
 						"Отправление:\n" + point(seg.getObject("from")) + "\n" +
-						shortDate(departure) + " " + time(departure) + "\n" + d + "\n" +
+						shortDate(departure) + " " + time(departure) + (tzDiffer ? " (" + getTimeZoneStr(dep) + ")" : "") + "\n" + d + "\n" +
 						"Прибытие:\n" + point(seg.getObject("to")) + "\n" +
-						shortDate(arrival) + " " + time(arrival) + "\n" +
+						shortDate(arrival) + " " + time(arrival) + (tzDiffer ? " (" + getTimeZoneStr(arr) + ")" : "") + "\n" +
 						(seg.has("duration") ? (duration(seg.getInt("duration")) + "\n") : "") + "\n"
 						);
 				s.setFont(smallfont);
@@ -691,11 +743,12 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			display(f);
 			break;
 		}
-		case RUN_SEARCH: {
+		case RUN_SEARCH: { // поиск точек
 			if(search == null) {
 				search = new Search();
 				search.app = this;
 			} else if(searching) {
+				// отменить текущий поиск, если что-то уже ищется
 				search.reader = null;
 				search.cancel = true;
 				try {
@@ -720,6 +773,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 					r.closeRecordStore();
 				}
 				l.addCommand(removeBookmarkCmd);
+				l.addCommand(moveBookmarkCmd);
 				for(Enumeration e = bookmarks.elements(); e.hasMoreElements();) {
 					JSONObject bm = (JSONObject) e.nextElement();
 					l.append(bm.has("n") ? bm.getString("n") : bm.getString("c") + " - " + bm.getString("d"), null);
@@ -729,7 +783,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			display(l);
 			break;
 		}
-		case RUN_UPDATE_RESULT: {
+		case RUN_UPDATE_RESULT: { // обновить форму результатов
 			if(result == null) break;
 			items.clear();
 			resultForm.deleteAll();
@@ -737,7 +791,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			display(resultForm);
 			break;
 		}
-		case RUN_NEAREST_CITY: {
+		case RUN_NEAREST_CITY: { // запросить ближайший город, координаты уже получены
 			display(loadingAlert("Загрузка"), searchForm);
 			try {
 				JSONObject r = api("nearest_settlement/?lat=" + gpslat + "&lng=" + gpslon);
@@ -757,7 +811,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	}
 
 	private String point(JSONObject o) {
-		if("station".equals(o.getString("type"))) {
+		if("station".equals(o.getString("type"))) { // если станция, добавить её тип
 			return o.getString("title") + " (" + o.getString("station_type_name") + ")";
 		}
 		return o.getString("title");
@@ -876,9 +930,11 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	InputStreamReader openCitiesStream() throws IOException {
 		if(stream != null) {
 			try {
+				// попытка ресетнуть поток
 				stream.reset();
 				return new InputStreamReader(new FilterStream(stream), "UTF-8");
 			} catch (Exception e) {
+				// не получилось, переоткрываем
 				try {
 					stream.close();
 				} catch (IOException e2) {}
@@ -903,6 +959,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		if("bus".equals(transport)) {
 			return busImg;
 		}
+		// хеликоптер
 		throw new RuntimeException("Unknown transport_type: " + transport);
 	}
 	
@@ -984,13 +1041,15 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		}
 		return c;
 	}
-	
+
+	// получить календарь текущего времени, учитывая настройки таймзоны
 	static Calendar getLocalizedTime(long time) {
 		Calendar c = Calendar.getInstance();
 		c.setTime(new Date(time - c.getTimeZone().getRawOffset() + parseTimeZone(timezone)));
 		return c;
 	}
 	
+	// парс даты, учитывая настройки таймзоны
 	static Calendar getLocalizedDate(String date) {
 		if(timezoneMode == 0)
 			return parseDate(date);
@@ -999,26 +1058,37 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		return c;
 	}
 	
+	// парс даты в таймстампу
 	static long parseDateGMT(String date) {
 		Calendar c = parseDate(date);
 		return c.getTime().getTime() + c.getTimeZone().getRawOffset() - parseTimeZone(date);
 	}
+	
+	// отрезать таймзону из даты
+	static String getTimeZoneStr(String date) {
+		int i = date.lastIndexOf('+');
+		if(i == -1)
+			i = date.lastIndexOf('-');
+		if(i == -1)
+			return null;
+		return date.substring(i);
+	}
 
+	// получение оффсета таймзоны даты в миллисекундах
 	static int parseTimeZone(String date) {
-		int i = date.indexOf('+');
+		int i = date.lastIndexOf('+');
 		boolean m = false;
 		if(i == -1) {
-			i = date.indexOf('-');
+			i = date.lastIndexOf('-');
 			m = true;
 		}
-		if(i != -1) {
-			date = date.substring(i + 1);
-			int offset = date.indexOf(':');
-			offset = (Integer.parseInt(date.substring(i + 1, offset)) * 3600000) +
-					(Integer.parseInt(date.substring(offset + 1)) * 60000);
-			return m ? -offset : offset;
-		}
-		return 0;
+		if(i == -1)
+			return 0;
+		date = date.substring(i + 1);
+		int offset = date.lastIndexOf(':');
+		offset = (Integer.parseInt(date.substring(0, offset)) * 3600000) +
+				(Integer.parseInt(date.substring(offset + 1)) * 60000);
+		return m ? -offset : offset;
 	}
 
 	static String shortDate(Calendar c) {
@@ -1074,14 +1144,10 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	static String duration(int t) {
 		t /= 60;
 		if(t > 24 * 60) {
-			int hours = t / 60;
-			if(hours == 0)
-				return (hours / 24) + " д.";
-			return (hours / 24) + " д. " + (hours % 24) + " ч.";
+			t /= 60;
+			return (t / 24) + " д. " + (t % 24) + " ч.";
 		}
 		if(t > 60) {
-			if(t % 60 == 0)
-				return (t / 60) + " ч.";
 			return (t / 60) + " ч. " + (t % 60) + " мин";
 		}
 		return t + " мин";
