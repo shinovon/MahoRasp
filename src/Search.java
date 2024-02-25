@@ -27,11 +27,25 @@ public class Search implements Runnable {
 					r = reader = app.openCitiesStream();
 					if(reader.read() != 'm' || reader.read() != '[')
 						throw new Exception("Cities database is corrupted");
+					StringBuffer sb;
+					char c;
 					while(!cancel) {
-						String regionName = nextString();
+						sb = new StringBuffer();
+						while((c = (char) reader.read()) != '"') {
+							sb.append(c);
+						}
+						String regionName = sb.toString();
 						for(;;) {
-							String code = nextString();
-							String cityName = nextString();
+							sb = new StringBuffer();
+							while((c = (char) reader.read()) != '"') {
+								sb.append(c);
+							}
+							String code = sb.toString();
+							sb = new StringBuffer();
+							while((c = (char) reader.read()) != '"') {
+								sb.append(c);
+							}
+							String cityName = sb.toString();
 							if(cityName.toLowerCase().startsWith(query)) {
 								app.searchChoice.append(cityName + ", " + regionName, null);
 								app.searchIds.addElement(code);
@@ -83,15 +97,6 @@ public class Search implements Runnable {
 		synchronized(this) {
 			notifyAll();
 		}
-	}
-	
-	String nextString() throws IOException {
-		StringBuffer sb = new StringBuffer();
-		char c;
-		while((c = (char) reader.read()) != '"') {
-			sb.append(c);
-		}
-		return sb.toString();
 	}
 	
 }
