@@ -1,4 +1,3 @@
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Enumeration;
 import java.util.Vector;
