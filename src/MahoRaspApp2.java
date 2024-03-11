@@ -96,7 +96,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static final String BOOKMARKS_RECORDNAME = "mahoRbm";
 
 	public static MahoRaspApp2 midlet;
-	private Display display;
+	private static Display display;
 	
 	private boolean started;
 	
@@ -116,10 +116,10 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	
 	private Form resultForm;
 
-	private Image planeImg;
-	private Image trainImg;
-	private Image suburbanImg;
-	private Image busImg;
+	private static Image planeImg;
+	private static Image trainImg;
+	private static Image suburbanImg;
+	private static Image busImg;
 
 	private int run;
 	private boolean running;
@@ -413,6 +413,11 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			s.setLayout(Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_LEFT);
 			f.append(s);
 			s = new StringItem("Сайт", "nnp.nnchan.ru", Item.HYPERLINK);
+			s.setLayout(Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_LEFT);
+			s.setDefaultCommand(hyperlinkCmd);
+			s.setItemCommandListener(this);
+			f.append(s);
+			s = new StringItem("Донат", "boosty.to/nnproject/donate", Item.HYPERLINK);
 			s.setLayout(Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_LEFT);
 			s.setDefaultCommand(hyperlinkCmd);
 			s.setItemCommandListener(this);
@@ -758,7 +763,9 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 					}
 				} catch (Exception e) {}
 			}
-			new Thread(search).start();
+			Thread t = new Thread(search);
+			t.setPriority(9);
+			t.start();
 			break;
 		}
 		case RUN_BOOKMARKS_SCREEN: {
@@ -861,7 +868,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			} else {
 				JSONObject thread = seg.getObject("thread");
 				r += thread.getString("number") + " " + thread.getString("title") + "\n";
-				resultForm.append(new ImageItem(null, transportImg(thread.getString("transport_type")), Item.LAYOUT_LEFT, null));
+				resultForm.append(new ImageItem(null, transportImg(thread.getString("transport_type")), Item.LAYOUT_LEFT | Item.LAYOUT_NEWLINE_BEFORE, null));
 			}
 			r += (oneDay(cal, departure) ? time(departure) : shortDate(departure) + " " + time(departure));
 			r += " - " + (oneDay(cal, arrival) ? time(arrival) : shortDate(arrival) + " " + time(arrival)) + "\n";
@@ -869,7 +876,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			s.addCommand(itemCmd);
 			s.setDefaultCommand(itemCmd);
 			s.setItemCommandListener(this);
-			s.setLayout(Item.LAYOUT_LEFT);
+			s.setLayout(Item.LAYOUT_LEFT | Item.LAYOUT_NEWLINE_AFTER);
 			items.put(s, new Integer(i));
 			resultForm.append(s);
 		}
@@ -947,7 +954,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		return new InputStreamReader(new FilterStream(stream), "UTF-8");
 	}
 	
-	private Image transportImg(String transport) {
+	private static Image transportImg(String transport) {
 		if("plane".equals(transport)) {
 			return planeImg;
 		}
@@ -964,7 +971,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		throw new RuntimeException("Unknown transport_type: " + transport);
 	}
 	
-	void display(Alert a, Displayable d) {
+	static void display(Alert a, Displayable d) {
 		if(d == null) {
 			display.setCurrent(a);
 			return;
@@ -980,7 +987,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		display.setCurrent(d);
 	}
 
-	private Alert loadingAlert(String text) {
+	private static Alert loadingAlert(String text) {
 		Alert a = new Alert("");
 		a.setString(text);
 		a.setIndicator(new Gauge(null, false, Gauge.INDEFINITE, Gauge.CONTINUOUS_RUNNING));
@@ -988,7 +995,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		return a;
 	}
 	
-	Alert warningAlert(String text) {
+	static Alert warningAlert(String text) {
 		Alert a = new Alert("");
 		a.setType(AlertType.ERROR);
 		a.setString(text);
@@ -996,7 +1003,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		return a;
 	}
 	
-	private Alert infoAlert(String text) {
+	private static Alert infoAlert(String text) {
 		Alert a = new Alert("");
 		a.setType(AlertType.INFO);
 		a.setString(text);
@@ -1006,12 +1013,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	
 	static String n(int n) {
 		if(n < 10) {
-			return "0".concat(i(n));
-		} else return i(n);
-	}
-	
-	static String i(int n) {
-		return Integer.toString(n);
+			return "0".concat(Integer.toString(n));
+		} else return Integer.toString(n);
 	}
 	
 	// парсер даты ISO 8601 без учета часового пояса
