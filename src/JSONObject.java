@@ -19,48 +19,35 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-package cc.nnproject.json;
+
 
 import java.util.Enumeration;
 import java.util.Hashtable;
 
-public class JSONObject extends AbstractJSON {
+// Modified version of org.nnproject.json
+public class JSONObject {
 
 	protected Hashtable table;
 
 	public JSONObject() {
 		table = new Hashtable();
 	}
-
-	/**
-	 * @deprecated Doesn't adapt nested elements
-	 */
-	public JSONObject(Hashtable table) {
-		this.table = table;
-	}
-
-	/**
-	 * @deprecated Compatibility with org.json
-	 */
-	public JSONObject(String str) {
-		table = JSON.getObject(str).table; // FIXME
-	}
 	
-	public Object get(String name) throws JSONException {
+	public Object get(String name) {
 		try {
 			if (has(name)) {
 				Object o = table.get(name);
-				if (o instanceof JSONString)
-					table.put(name, o = JSON.parseJSON(((JSONString) o).str));
-				if (o == JSON.json_null)
+				if (o instanceof String[])
+					table.put(name, o = MahoRaspApp2.parseJSON(((String[]) o)[0]));
+				if (o == MahoRaspApp2.json_null)
 					return null;
 				return o;
 			}
-		} catch (JSONException e) {
+		} catch (RuntimeException e) {
 			throw e;
 		} catch (Exception e) {
 		}
-		throw new JSONException("No value for name: " + name);
+		throw new RuntimeException("JSON: No value for name: " + name);
 	}
 	
 	// unused methods should be removed by proguard shrinking
@@ -78,7 +65,7 @@ public class JSONObject extends AbstractJSON {
 		return get(name, null);
 	}
 	
-	public String getString(String name) throws JSONException {
+	public String getString(String name) {
 		Object o = get(name);
 		if (o == null || o instanceof String)
 			return (String) o;
@@ -100,11 +87,11 @@ public class JSONObject extends AbstractJSON {
 		return getString(name, null);
 	}
 	
-	public JSONObject getObject(String name) throws JSONException {
+	public JSONObject getObject(String name) {
 		try {
 			return (JSONObject) get(name);
 		} catch (ClassCastException e) {
-			throw new JSONException("Not object: " + name);
+			throw new RuntimeException("JSON: Not object: " + name);
 		}
 	}
 	public JSONObject getObject(String name, JSONObject def) {
@@ -121,15 +108,15 @@ public class JSONObject extends AbstractJSON {
 		return getObject(name, null);
 	}
 	
-	public JSONArray getArray(String name) throws JSONException {
+	public JSONArray getArray(String name) {
 		try {
 			return (JSONArray) get(name);
 		} catch (ClassCastException e) {
-			throw new JSONException("Not array: " + name);
+			throw new RuntimeException("JSON: Not array: " + name);
 		}
 	}
 	
-	public JSONArray getArray(String name, JSONArray def) throws JSONException {
+	public JSONArray getArray(String name, JSONArray def) {
 		if (has(name)) {
 			try {
 				return (JSONArray) get(name);
@@ -144,8 +131,8 @@ public class JSONObject extends AbstractJSON {
 		return getArray(name, null);
 	}
 	
-	public int getInt(String name) throws JSONException {
-		return JSON.getInt(get(name));
+	public int getInt(String name) {
+		return MahoRaspApp2.getInt(get(name));
 	}
 	
 	public int getInt(String name, int def) {
@@ -157,8 +144,8 @@ public class JSONObject extends AbstractJSON {
 		}
 	}
 	
-	public long getLong(String name) throws JSONException {
-		return JSON.getLong(get(name));
+	public long getLong(String name) {
+		return MahoRaspApp2.getLong(get(name));
 	}
 
 	public long getLong(String name, long def) {
@@ -170,23 +157,10 @@ public class JSONObject extends AbstractJSON {
 		}
 	}
 	
-	public double getDouble(String name) throws JSONException {
-		return JSON.getDouble(get(name));
-	}
-
-	public double getDouble(String name, double def) {
-		if (!has(name)) return def;
-		try {
-			return getDouble(name);
-		} catch (Exception e) {
-			return def;
-		}
-	}
-	
-	public boolean getBoolean(String name) throws JSONException {
+	public boolean getBoolean(String name) {
 		Object o = get(name);
-		if (o == JSON.TRUE) return true;
-		if (o == JSON.FALSE) return false;
+		if (o == MahoRaspApp2.TRUE) return true;
+		if (o == MahoRaspApp2.FALSE) return false;
 		if (o instanceof Boolean) return ((Boolean) o).booleanValue();
 		if (o instanceof String) {
 			String s = (String) o;
@@ -194,7 +168,7 @@ public class JSONObject extends AbstractJSON {
 			if (s.equals("true")) return true;
 			if (s.equals("false")) return false;
 		}
-		throw new JSONException("Not boolean: " + o);
+		throw new RuntimeException("JSON: Not boolean: " + o);
 	}
 
 	public boolean getBoolean(String name, boolean def) {
@@ -208,19 +182,12 @@ public class JSONObject extends AbstractJSON {
 	
 	public boolean isNull(String name) {
 		if (!has(name))
-			throw new JSONException("No value for name: " + name);
-		return table.get(name) == JSON.json_null;
+			throw new RuntimeException("JSON: No value for name: " + name);
+		return table.get(name) == MahoRaspApp2.json_null;
 	}
 	
-	/**
-	 * @deprecated
-	 */
 	public void put(String name, Object obj) {
-		table.put(name, JSON.getJSON(obj));
-	}
-	
-	public void put(String name, AbstractJSON json) {
-		table.put(name, json);
+		table.put(name, obj);
 	}
 	
 	public void put(String name, String s) {
@@ -244,7 +211,7 @@ public class JSONObject extends AbstractJSON {
 	}
 	
 	public boolean hasValue(Object object) {
-		return table.contains(JSON.getJSON(object));
+		return table.contains(object);
 	}
 	
 	// hasKey
@@ -273,40 +240,7 @@ public class JSONObject extends AbstractJSON {
 	}
 	
 	public boolean equals(Object obj) {
-		return this == obj || super.equals(obj) || similar(obj);
-	}
-	
-	public boolean similar(Object obj) {
-		if (!(obj instanceof JSONObject)) {
-			return false;
-		}
-		if (table.equals(((JSONObject) obj).table)) {
-			return true;
-		}
-		int size = size();
-		if (size != ((JSONObject)obj).size()) {
-			return false;
-		}
-		Enumeration keys = table.keys();
-		while (keys.hasMoreElements()) {
-			String key = (String) keys.nextElement();
-			Object a = get(key);
-			Object b = ((JSONObject)obj).get(key);
-			if (a == b) {
-				continue;
-			}
-			if (a == null) {
-				return false;
-			}
-			if (a instanceof AbstractJSON) {
-				if (!((AbstractJSON)a).similar(b)) {
-					return false;
-				}
-			} else if (!a.equals(b)) {
-				return false;
-			}
-		}
-		return true;
+		return this == obj || super.equals(obj);
 	}
 
 	public String build() {
@@ -318,11 +252,13 @@ public class JSONObject extends AbstractJSON {
 			String k = (String) keys.nextElement();
 			s.append("\"").append(k).append("\":");
 			Object v = table.get(k);
-			if (v instanceof AbstractJSON) {
-				s.append(((AbstractJSON) v).build());
+			if (v instanceof JSONArray) {
+				s.append(((JSONArray) v).build());
+			} else if (v instanceof JSONObject) {
+				s.append(((JSONObject) v).build());
 			} else if (v instanceof String) {
-				s.append("\"").append(JSON.escape_utf8((String) v)).append("\"");
-			} else if (v == JSON.json_null) {
+				s.append("\"").append(MahoRaspApp2.escape_utf8((String) v)).append("\"");
+			} else if (v == MahoRaspApp2.json_null) {
 				s.append((String) null);
 			} else {
 				s.append(v);
@@ -333,47 +269,6 @@ public class JSONObject extends AbstractJSON {
 			s.append(",");
 		}
 		s.append("}");
-		return s.toString();
-	}
-
-	protected String format(int l) {
-		int size = size();
-		if (size == 0)
-			return "{}";
-		String t = "";
-		for (int i = 0; i < l; i++) {
-			t = t.concat(JSON.FORMAT_TAB);
-		}
-		String t2 = t.concat(JSON.FORMAT_TAB);
-		StringBuffer s = new StringBuffer("{\n");
-		s.append(t2);
-		Enumeration keys = table.keys();
-		int i = 0;
-		while (keys.hasMoreElements()) {
-			String k = (String) keys.nextElement();
-			s.append("\"").append(k).append("\": ");
-			Object v = get(k);
-			if (v instanceof JSONString)
-				table.put(k, v = JSON.parseJSON(((JSONString) v).str));
-			if (v instanceof AbstractJSON) {
-				s.append(((AbstractJSON) v).format(l + 1));
-			} else if (v instanceof String) {
-				s.append("\"").append(JSON.escape_utf8((String) v)).append("\"");
-			} else if (v == JSON.json_null) {
-				s.append((String) null);
-			} else {
-				s.append(v);
-			}
-			i++;
-			if (i < size) {
-				s.append(",\n").append(t2);
-			}
-		}
-		if (l > 0) {
-			s.append("\n").append(t).append("}");
-		} else {
-			s.append("\n}");
-		}
 		return s.toString();
 	}
 
@@ -403,8 +298,8 @@ public class JSONObject extends AbstractJSON {
 		while (keys.hasMoreElements()) {
 			String k = (String) keys.nextElement();
 			Object v = table.get(k);
-			if (v instanceof JSONString)
-				table.put(k, v = JSON.parseJSON(((JSONString) v).str));
+			if (v instanceof String[])
+				table.put(k, v = MahoRaspApp2.parseJSON(((String[]) v)[0]));
 			if (v instanceof JSONObject) {
 				v = ((JSONObject) v).toTable();
 			} else if (v instanceof JSONArray) {
@@ -418,8 +313,5 @@ public class JSONObject extends AbstractJSON {
 	void _put(String name, Object obj) {
 		table.put(name, obj);
 	}
-	
-	// TODO: Enumeration elements()
-	// TODO: String keyOf(Object)
 
 }

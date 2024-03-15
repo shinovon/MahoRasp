@@ -30,12 +30,11 @@ import javax.microedition.lcdui.ItemStateListener;
 import javax.microedition.lcdui.List;
 import javax.microedition.lcdui.StringItem;
 import javax.microedition.lcdui.TextField;
+import javax.microedition.location.Location;
+import javax.microedition.location.LocationProvider;
+import javax.microedition.location.QualifiedCoordinates;
 import javax.microedition.midlet.MIDlet;
 import javax.microedition.rms.RecordStore;
-
-import cc.nnproject.json.JSON;
-import cc.nnproject.json.JSONArray;
-import cc.nnproject.json.JSONObject;
 
 public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommandListener, Runnable, ItemStateListener {
 
@@ -75,6 +74,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static final int RUN_BOOKMARKS_SCREEN = 4;
 	private static final int RUN_UPDATE_RESULT = 5;
 	private static final int RUN_NEAREST_CITY = 6;
+	private static final int RUN_LOCATION = 7;
 	
 	private static final int BOOKMARK_CITIES = 1;
 //	private static final int BOOKMARK_STATIONS = 2;
@@ -98,23 +98,23 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	public static MahoRaspApp2 midlet;
 	private static Display display;
 	
-	private boolean started;
+	private static boolean started;
 	
 	// ui главной
-	private Form mainForm;
-	private ChoiceGroup transportChoice;
-	private DateField dateField;
-	private StringItem fromBtn;
-	private StringItem toBtn;
-	private StringItem submitBtn;
-	private ChoiceGroup showTransfers;
+	private static Form mainForm;
+	private static ChoiceGroup transportChoice;
+	private static DateField dateField;
+	private static StringItem fromBtn;
+	private static StringItem toBtn;
+	private static StringItem submitBtn;
+	private static ChoiceGroup showTransfers;
 
-	private Form settingsForm;
-	private TextField timezoneField;
-	private ChoiceGroup timezoneChoice;
+	private static Form settingsForm;
+	private static TextField timezoneField;
+	private static ChoiceGroup timezoneChoice;
 //	private ChoiceGroup proxyChoice;
 	
-	private Form resultForm;
+	private static Form resultForm;
 
 	private static Image planeImg;
 	private static Image trainImg;
@@ -122,35 +122,39 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static Image busImg;
 
 	private int run;
-	private boolean running;
+	private static boolean running;
 	
-	private String from;
-	private String to;
+	private static String from;
+	private static String to;
 
-	private JSONObject result;
-	private Hashtable items;
-	private int selectedItem;
-	private String resultTitle;
-	private boolean showGone;
+	private static JSONObject result;
+	private static Hashtable items = new Hashtable();
+	private static int selectedItem;
+	private static String resultTitle;
+	private static boolean showGone;
 	
-	Form searchForm;
-	TextField searchField;
-	ChoiceGroup searchChoice;
+	private static Form searchForm;
+	private static TextField searchField;
+	private static ChoiceGroup searchChoice;
 
-	private int choosing;
-	Vector searchIds;
-	boolean searchCancel;
-	private InputStream stream;
-	private Search search;
-	boolean searching;
+	private static int choosing;
+	private static Vector searchIds = new Vector();
+	private static boolean searchDoneCmdAdded;
+	private static InputStream stream;
+	private static Object searchLock = new Object();
+	private static boolean searching;
 	
-	private JSONArray bookmarks;
-	private int movingBookmark = -1;
+	private static InputStreamReader searchReader;
+	private static boolean searchCancel;
+	
+	private static JSONArray bookmarks;
+	private static int movingBookmark = -1;
 
-	private Alert gpsDialog;
-	private boolean gpsActive;
-	static double gpslat;
-	static double gpslon;
+	private static Object locationProvider;
+	private static Alert gpsDialog;
+	private static boolean gpsActive;
+	private static double gpslat;
+	private static double gpslon;
 	
 	// настройки
 	private static String timezone;
@@ -159,8 +163,6 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 
 	public MahoRaspApp2() {
 		midlet = this;
-		items = new Hashtable();
-		searchIds = new Vector();
 		mainForm = new Form("MahoRasp");
 		mainForm.addCommand(exitCmd);
 		mainForm.addCommand(bookmarksCmd);
@@ -219,7 +221,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		try {
 			// загрузка настроек
 			RecordStore r = RecordStore.openRecordStore(SETTINGS_RECORDNAME, false);
-			JSONObject j = JSON.getObject(new String(r.getRecord(1), "UTF-8"));
+			JSONObject j = getObject(new String(r.getRecord(1), "UTF-8"));
 			r.closeRecordStore();
 			timezone = j.getString("tz", timezone);
 			timezoneMode = j.getInt("tzm", timezoneMode);
@@ -232,14 +234,14 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		if(c == itemCmd) { // выбран рейс, показать его детали
 			display(loadingAlert("Загрузка"), null);
 			selectedItem = ((Integer) items.get(i)).intValue();
-			run(2);
+			start(2);
 			return;
 		}
 		if(c == choosePointCmd) { // начать выбор точки
 			choosing = i == fromBtn ? 1 : 2;
 			// TODO выбор станции
 			searchForm = new Form("Выбор города");
-			searchCancel = true;
+			searchDoneCmdAdded = true;
 			searchField = new TextField("Поиск", "", 100, TextField.ANY);
 			searchField.setItemCommandListener(this);
 			searchForm.append(searchField);
@@ -262,7 +264,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			if(running) return;
 			showGone = true;
 			display(loadingAlert("Загрузка"));
-			run(RUN_UPDATE_RESULT);
+			start(RUN_UPDATE_RESULT);
 			return;
 		}
 		if(c == hyperlinkCmd) { // открыть гиперссылку из формы "о программе"
@@ -321,7 +323,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			}
 			showGone = false;
 			display(loadingAlert("Загрузка"));
-			run(RUN_REQUEST);
+			start(RUN_REQUEST);
 			return;
 		}
 		if(c == settingsCmd) {
@@ -353,7 +355,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			display(gpsDialog, searchForm);
 			try {
 				Class.forName("javax.microedition.location.LocationProvider");
-				new Thread(new GPS()).start();
+				start(RUN_LOCATION);
 			} catch (Throwable e) {
 				display(warningAlert(e.toString()), searchForm);
 			}
@@ -371,7 +373,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			if(d == gpsDialog) { // отменен диалог гпс
 				gpsActive = false;
 				try {
-					GPS.reset();
+					resetGPS();
 				} catch (Throwable e) {}
 				display(searchForm);
 				return;
@@ -440,7 +442,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			date.setTime(date.getTime()-24*60*60*1000);
 			dateField.setDate(date);
 			display(loadingAlert("Загрузка"));
-			run(RUN_REQUEST);
+			start(RUN_REQUEST);
 			return;
 		}
 		if(c == nextDayCmd) { // следующий день в форме результатов
@@ -449,13 +451,13 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			date.setTime(date.getTime()+24*60*60*1000);
 			dateField.setDate(date);
 			display(loadingAlert("Загрузка"));
-			run(RUN_REQUEST);
+			start(RUN_REQUEST);
 			return;
 		}
 		if(c == bookmarksCmd) { // открыть список закладок
 			if(running) return;
 			display(loadingAlert("Загрузка"));
-			run(RUN_BOOKMARKS_SCREEN);
+			start(RUN_BOOKMARKS_SCREEN);
 			return;
 		}
 		if(c == addBookmarkCmd) { // добавить маршрут город-город в закладки
@@ -469,7 +471,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			if(bookmarks == null) {
 				try {
 					RecordStore r = RecordStore.openRecordStore(BOOKMARKS_RECORDNAME, false);
-					bookmarks = JSON.getArray(new String(r.getRecord(1), "UTF-8"));
+					bookmarks = getArray(new String(r.getRecord(1), "UTF-8"));
 					r.closeRecordStore();
 				} catch (Exception e) {
 					bookmarks = new JSONArray();
@@ -566,24 +568,29 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	public void itemStateChanged(Item item) {
 		if(item == searchField) { // выполнять поиск при изменениях в поле ввода
 			if(running) return;
-			run(RUN_SEARCH);
+			start(RUN_SEARCH);
 		}
 		if(item == searchChoice) {
 			if(searchChoice.getSelectedIndex() != -1) {
-				if(!searchCancel) return;
-				searchForm.addCommand(MahoRaspApp2.doneCmd);
-				searchCancel = false;
+				if(!searchDoneCmdAdded) return;
+				searchForm.addCommand(doneCmd);
+				searchDoneCmdAdded = false;
 				return;
 			}
-			if(searchCancel) return;
-			searchForm.removeCommand(MahoRaspApp2.doneCmd);
-			searchCancel = true;
+			if(searchDoneCmdAdded) return;
+			searchForm.removeCommand(doneCmd);
+			searchDoneCmdAdded = true;
 			return;
 		}
 	}
 	
 	public void run() {
-		running = true;
+		int run;
+		synchronized(this) {
+			run = this.run;
+			notify();
+		}
+		running = run != RUN_SEARCH && run != RUN_LOCATION;
 		switch(run) {
 		case RUN_REQUEST: { // запрос
 			items.clear();
@@ -750,23 +757,100 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			break;
 		}
 		case RUN_SEARCH: { // поиск точек
-			if(search == null) {
-				search = new Search();
-				search.app = this;
-			} else if(searching) {
+			if(searching) {
 				// отменить текущий поиск, если что-то уже ищется
-				search.reader = null;
-				search.cancel = true;
+				searchReader = null;
+				searchCancel = true;
 				try {
-					synchronized(search) {
-						search.wait();
+					synchronized(searchLock) {
+						searchLock.wait();
 					}
 				} catch (Exception e) {}
 			}
-			Thread t = new Thread(search);
-			t.setPriority(9);
-			t.start();
-			break;
+			searching = true;
+			InputStreamReader r = null;
+			s: {
+				try {
+					String query = searchField.getString().toLowerCase().trim();
+					searchChoice.deleteAll();
+					searchIds.removeAllElements();
+					searchChoice.setLabel("Поиск...");
+					Vector items = new Vector();
+					search: {
+						if(query.length() < 3) break search;
+						r = searchReader = openCitiesStream();
+						if(searchReader.read() != 'm' || searchReader.read() != '[')
+							throw new Exception("Cities database is corrupted");
+						StringBuffer sb;
+						char c;
+						while(!searchCancel) {
+							sb = new StringBuffer();
+							while((c = (char) searchReader.read()) != '"') {
+								sb.append(c);
+							}
+							String regionName = sb.toString();
+							for(;;) {
+								sb = new StringBuffer();
+								while((c = (char) searchReader.read()) != '"') {
+									sb.append(c);
+								}
+								String code = sb.toString();
+								sb = new StringBuffer();
+								while((c = (char) searchReader.read()) != '"') {
+									sb.append(c);
+								}
+								String cityName = sb.toString();
+								if(cityName.toLowerCase().startsWith(query)) {
+									searchChoice.append(cityName + ", " + regionName, null);
+									searchIds.addElement(code);
+								} else if(regionName.toLowerCase().startsWith(query)) {
+									items.addElement(new String[] {cityName, regionName, code});
+								}
+								if(searchReader.read() != ',') {
+									break;
+								}
+							}
+							if(searchReader.read() != ',') {
+								break;
+							}
+						}
+					}
+					if(searchForm == null || searchCancel) break s;
+					searchChoice.setLabel("");
+					for(Enumeration e = items.elements(); e.hasMoreElements(); ) {
+						if(searchChoice.size() > 10) break;
+						String[] s = (String[]) e.nextElement();
+						searchChoice.append(s[0] + ", " + s[1], null);
+						searchIds.addElement(s[2]);
+					}
+					// замена функции "отмена" на "готово"
+					if(searchChoice.getSelectedIndex() != -1) {
+						if(!searchDoneCmdAdded) break s;
+		//				searchForm.removeCommand(cancelCmd);
+						searchForm.addCommand(doneCmd);
+						searchDoneCmdAdded = false;
+						break s;
+					}
+					if(searchDoneCmdAdded) break s;
+					searchForm.removeCommand(doneCmd);
+		//			searchForm.addCommand(cancelCmd);
+					searchDoneCmdAdded = true;
+				} catch (Exception e) {
+					if(searchCancel) break s;
+					e.printStackTrace();
+					display(warningAlert(e.toString()), searchForm);
+				}
+			}
+			if(r != null) {
+				try {
+					r.close();
+				} catch (Exception e) {}
+			}
+			searchCancel = searching = false;
+			synchronized(searchLock) {
+				searchLock.notifyAll();
+			}
+			return;
 		}
 		case RUN_BOOKMARKS_SCREEN: {
 			List l = new List("Закладки", List.IMPLICIT);
@@ -777,7 +861,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			try {
 				if(bookmarks == null) {
 					RecordStore r = RecordStore.openRecordStore(BOOKMARKS_RECORDNAME, false);
-					bookmarks = JSON.getArray(new String(r.getRecord(1), "UTF-8"));
+					bookmarks = getArray(new String(r.getRecord(1), "UTF-8"));
 					r.closeRecordStore();
 				}
 				l.addCommand(removeBookmarkCmd);
@@ -813,9 +897,15 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			}
 			break;
 		}
+		case RUN_LOCATION: {
+			try {
+				runGPS();
+			} catch (Throwable e) {}
+			gpsDone();
+			return;
+		}
 		}
 		running = false;
-		run = 0;
 	}
 
 	private String point(JSONObject o) {
@@ -891,7 +981,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		}
 	}
 
-	void gpsDone() {
+	private void gpsDone() {
 		if(!gpsActive) return;
 		gpsActive = false;
 		if(gpslat == 0 && gpslon == 0) {
@@ -899,13 +989,19 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			display(warningAlert("Не удалось получить геолокацию"), searchForm);
 			return;
 		}
-		run(RUN_NEAREST_CITY);
+		start(RUN_NEAREST_CITY);
 //		display(searchForm);
 	}
 
-	private void run(int run) {
-		this.run = run;
-		new Thread(this).start();
+	private void start(int i) {
+		try {
+			synchronized(this) {
+				run = i;
+				new Thread(this).start();
+				wait();
+				run = 0;
+			}
+		} catch (Exception e) {}
 	}
 	
 	private void select(String code, String title) {
@@ -923,11 +1019,11 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		display(mainForm);
 	}
 	
-	private void cancelChoice() {
+	private static void cancelChoice() {
 		display(mainForm);
-		if(search != null) {
-			search.reader = null;
-			search.cancel = true;
+		if(searching) {
+			searchReader = null;
+			searchCancel = true;
 		}
 		searchForm = null;
 		searchField = null;
@@ -954,6 +1050,28 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		return new InputStreamReader(new FilterStream(stream), "UTF-8");
 	}
 	
+	private static void runGPS() {
+		try {
+			if(locationProvider == null) {
+				locationProvider = LocationProvider.getInstance(null);
+			}
+			Location l = ((LocationProvider) locationProvider).getLocation(60);
+			if(l != null) {
+				QualifiedCoordinates c = l.getQualifiedCoordinates();
+				gpslat = c.getLatitude();
+				gpslon = c.getLongitude();
+			}
+		} catch (Throwable e) {
+			gpslat = 0;
+			gpslon = 0;
+		}
+	}
+	
+	private static void resetGPS() {
+		if(locationProvider == null) return;
+		((LocationProvider) locationProvider).reset();
+	}
+	
 	private static Image transportImg(String transport) {
 		if("plane".equals(transport)) {
 			return planeImg;
@@ -971,7 +1089,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		throw new RuntimeException("Unknown transport_type: " + transport);
 	}
 	
-	static void display(Alert a, Displayable d) {
+	private static void display(Alert a, Displayable d) {
 		if(d == null) {
 			display.setCurrent(a);
 			return;
@@ -979,7 +1097,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		display.setCurrent(a, d);
 	}
 	
-	private void display(Displayable d) {
+	private static void display(Displayable d) {
 		if(d instanceof Alert) {
 			display.setCurrent((Alert) d, mainForm);
 			return;
@@ -995,17 +1113,17 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		return a;
 	}
 	
-	static Alert warningAlert(String text) {
+	private static Alert warningAlert(String text) {
 		Alert a = new Alert("");
 		a.setType(AlertType.ERROR);
 		a.setString(text);
-		a.setTimeout(2000);
+		a.setTimeout(3000);
 		return a;
 	}
 	
 	private static Alert infoAlert(String text) {
 		Alert a = new Alert("");
-		a.setType(AlertType.INFO);
+		a.setType(AlertType.CONFIRMATION);
 		a.setString(text);
 		a.setTimeout(1500);
 		return a;
@@ -1263,12 +1381,292 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 //		if (proxy)
 //			url = "http://nnp.nnchan.ru:80/hproxy.php?u=" + url(url);
 		String r = getUtf("http://api.rasp.yandex.net/v3.0/" + url + (!url.endsWith("?") ? "&" : "") + "apikey=" + APIKEY + "&format=json&lang=ru_RU");
-		JSONObject j = JSON.getObject(r);
+		JSONObject j = getObject(r);
 		if(j.has("error")) {
 			// выбрасывать эксепшн с текстом ошибки
 			throw new Exception(j.getObject("error").getString("text"));
 		}
 		return j;
+	}
+	
+	// nnjson
+	
+	static final boolean parse_members = false;
+	
+	// identation for formatting
+	static final String FORMAT_TAB = "  ";
+	
+	// used for storing nulls, get methods must return real null
+	public static final Object json_null = new Object();
+	
+	public static final Boolean TRUE = new Boolean(true);
+	public static final Boolean FALSE = new Boolean(false);
+
+	public static JSONObject getObject(String text) {
+		if (text == null || text.length() <= 1)
+			throw new RuntimeException("JSON: Empty text");
+		if (text.charAt(0) != '{')
+			throw new RuntimeException("JSON: Not JSON object");
+		return (JSONObject) parseJSON(text);
+	}
+
+	public static JSONArray getArray(String text) {
+		if (text == null || text.length() <= 1)
+			throw new RuntimeException("JSON: Empty text");
+		if (text.charAt(0) != '[')
+			throw new RuntimeException("JSON: Not JSON array");
+		return (JSONArray) parseJSON(text);
+	}
+
+	static Object parseJSON(String str) {
+		char first = str.charAt(0);
+		int length = str.length() - 1;
+		char last = str.charAt(length);
+		switch(first) {
+		case '"': { // string
+			if (last != '"')
+				throw new RuntimeException("JSON: Unexpected end of text");
+			char[] chars = str.substring(1, length).toCharArray();
+			str = null;
+			int l = chars.length;
+			StringBuffer sb = new StringBuffer();
+			int i = 0;
+			// parse escaped chars in string
+			loop: {
+				while (i < l) {
+					char c = chars[i];
+					switch (c) {
+					case '\\': {
+						next: {
+							replace: {
+								if (l < i + 1) {
+									sb.append(c);
+									break loop;
+								}
+								char c1 = chars[i + 1];
+								switch (c1) {
+								case 'u':
+									i+=2;
+									sb.append((char) Integer.parseInt(
+											new String(new char[] {chars[i++], chars[i++], chars[i++], chars[i++]}),
+											16));
+									break replace;
+								case 'x':
+									i+=2;
+									sb.append((char) Integer.parseInt(
+											new String(new char[] {chars[i++], chars[i++]}),
+											16));
+									break replace;
+								case 'n':
+									sb.append('\n');
+									i+=2;
+									break replace;
+								case 'r':
+									sb.append('\r');
+									i+=2;
+									break replace;
+								case 't':
+									sb.append('\t');
+									i+=2;
+									break replace;
+								case 'f':
+									sb.append('\f');
+									i+=2;
+									break replace;
+								case 'b':
+									sb.append('\b');
+									i+=2;
+									break replace;
+								case '\"':
+								case '\'':
+								case '\\':
+								case '/':
+									i+=2;
+									sb.append((char) c1);
+									break replace;
+								default:
+									break next;
+								}
+							}
+							break;
+						}
+						sb.append(c);
+						i++;
+						break;
+					}
+					default:
+						sb.append(c);
+						i++;
+					}
+				}
+			}
+			str = sb.toString();
+			sb = null;
+			return str;
+		}
+		case '{': // JSON object or array
+		case '[': {
+			boolean object = first == '{';
+			if (object ? last != '}' : last != ']')
+				throw new RuntimeException("JSON: Unexpected end of text");
+			int brackets = 0;
+			int i = 1;
+			char nextDelimiter = object ? ':' : ',';
+			boolean escape = false;
+			String key = null;
+			Object res = object ? (Object) new JSONObject() : (Object) new JSONArray();
+			
+			for (int splIndex; i < length; i = splIndex + 1) {
+				// skip all spaces
+				for (; i < length - 1 && str.charAt(i) <= ' '; i++);
+
+				splIndex = i;
+				boolean quote = false;
+				for (; splIndex < length && (quote || brackets > 0 || str.charAt(splIndex) != nextDelimiter); splIndex++) {
+					char c = str.charAt(splIndex);
+					if (!escape) {
+						if (c == '\\') {
+							escape = true;
+						} else if (c == '"') {
+							quote = !quote;
+						}
+					} else escape = false;
+	
+					if (!quote) {
+						if (c == '{' || c == '[') {
+							brackets++;
+						} else if (c == '}' || c == ']') {
+							brackets--;
+						}
+					}
+				}
+
+				// fail if unclosed quotes or brackets left
+				if (quote || brackets > 0) {
+					throw new RuntimeException("JSON: Corrupted JSON");
+				}
+
+				if (object && key == null) {
+					key = str.substring(i, splIndex);
+					key = key.substring(1, key.length() - 1);
+					nextDelimiter = ',';
+				} else {
+					Object value = str.substring(i, splIndex).trim();
+					// don't check length because if value is empty, then exception is going to be thrown anyway
+					char c = ((String) value).charAt(0);
+					// leave String[] as value to parse it later, if its object or array and nested parsing is disabled
+					value = parse_members || (c != '{' && c != '[') ?
+							parseJSON((String) value) : new String[] {(String) value};
+					if (object) {
+						((JSONObject) res)._put(key, value);
+						key = null;
+						nextDelimiter = ':';
+					} else if (splIndex > i) {
+						((JSONArray) res).addElement(value);
+					}
+				}
+			}
+			return res;
+		}
+		case 'n': // null
+			return json_null;
+		case 't': // true
+			return TRUE;
+		case 'f': // false
+			return FALSE;
+		default: // number
+			if ((first >= '0' && first <= '9') || first == '-') {
+				try {
+					// hex
+					if (length > 1 && first == '0' && str.charAt(1) == 'x') {
+						if (length > 9) // str.length() > 10
+							return new Long(Long.parseLong(str.substring(2), 16));
+						return new Integer(Integer.parseInt(str.substring(2), 16));
+					}
+					// decimal
+					if (str.indexOf('.') != -1 || str.indexOf('E') != -1 || "-0".equals(str))
+						return new Double(Double.parseDouble(str));
+					if (first == '-') length--;
+					if (length > 8) // (str.length() - (str.charAt(0) == '-' ? 1 : 0)) >= 10
+						return new Long(Long.parseLong(str));
+					return new Integer(Integer.parseInt(str));
+				} catch (Exception e) {}
+			}
+			throw new RuntimeException("JSON: Couldn't be parsed: " + str);
+//			return new String[](str);
+		}
+	}
+
+	// transforms string for exporting
+	static String escape_utf8(String s) {
+		int len = s.length();
+		StringBuffer sb = new StringBuffer();
+		int i = 0;
+		while (i < len) {
+			char c = s.charAt(i);
+			switch (c) {
+			case '"':
+			case '\\':
+				sb.append("\\").append(c);
+				break;
+			case '\b':
+				sb.append("\\b");
+				break;
+			case '\f':
+				sb.append("\\f");
+				break;
+			case '\n':
+				sb.append("\\n");
+				break;
+			case '\r':
+				sb.append("\\r");
+				break;
+			case '\t':
+				sb.append("\\t");
+				break;
+			default:
+				if (c < 32 || c > 1103) {
+					String u = Integer.toHexString(c);
+					sb.append("\\u");
+					for (int z = u.length(); z < 4; z++) {
+						sb.append('0');
+					}
+					sb.append(u);
+				} else {
+					sb.append(c);
+				}
+			}
+			i++;
+		}
+		return sb.toString();
+	}
+
+	static int getInt(Object o) {
+		try {
+			if (o instanceof String[])
+				return Integer.parseInt(((String[]) o)[0]);
+			if (o instanceof Integer)
+				return ((Integer) o).intValue();
+			if (o instanceof Long)
+				return (int) ((Long) o).longValue();
+			if (o instanceof Double)
+				return ((Double) o).intValue();
+		} catch (Throwable e) {}
+		throw new RuntimeException("JSON: Cast to int failed: " + o);
+	}
+
+	static long getLong(Object o) {
+		try {
+			if (o instanceof String[])
+				return Long.parseLong(((String[]) o)[0]);
+			if (o instanceof Integer)
+				return ((Integer) o).longValue();
+			if (o instanceof Long)
+				return ((Long) o).longValue();
+			if (o instanceof Double)
+				return ((Double) o).longValue();
+		} catch (Throwable e) {}
+		throw new RuntimeException("JSON: Cast to long failed: " + o);
 	}
 
 }
