@@ -144,19 +144,6 @@ public class JSONObject {
 		}
 	}
 	
-	public long getLong(String name) {
-		return MahoRaspApp2.getLong(get(name));
-	}
-
-	public long getLong(String name, long def) {
-		if (!has(name)) return def;
-		try {
-			return getLong(name);
-		} catch (Exception e) {
-			return def;
-		}
-	}
-	
 	public boolean getBoolean(String name) {
 		Object o = get(name);
 		if (o == MahoRaspApp2.TRUE) return true;

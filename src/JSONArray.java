@@ -143,18 +143,6 @@ public class JSONArray {
 		}
 	}
 	
-	public long getLong(int index) {
-		return MahoRaspApp2.getLong(get(index));
-	}
-
-	public long getLong(int index, long def) {
-		try {
-			return getLong(index);
-		} catch (Exception e) {
-			return def;
-		}
-	}
-	
 	public boolean getBoolean(int index) {
 		Object o = get(index);
 		if (o == MahoRaspApp2.TRUE) return true;

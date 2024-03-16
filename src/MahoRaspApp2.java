@@ -41,11 +41,12 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	// команды главной формы
 	private static final Command exitCmd = new Command("Выход", Command.EXIT, 1);
 	private static final Command backCmd = new Command("Назад", Command.BACK, 1);
-	private static final Command bookmarksCmd = new Command("Закладки", Command.SCREEN, 3);
-	private static final Command settingsCmd = new Command("Настройки", Command.SCREEN, 4);
-	private static final Command aboutCmd = new Command("О программе", Command.SCREEN, 5);
+	private static final Command bookmarksCmd = new Command("Закладки", Command.SCREEN, 4);
+	private static final Command settingsCmd = new Command("Настройки", Command.SCREEN, 5);
+	private static final Command aboutCmd = new Command("О программе", Command.SCREEN, 6);
 	private static final Command submitCmd = new Command("Искать", Command.ITEM, 2);
 	private static final Command choosePointCmd = new Command("Выбрать", Command.ITEM, 1);
+	private static final Command reverseCmd = new Command("Развернуть", Command.SCREEN, 3);
 
 	// команды формы результатов
 	private static final Command addBookmarkCmd = new Command("Добавить в закладки", Command.SCREEN, 3);
@@ -55,7 +56,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static final Command itemCmd = new Command("Подробнее", Command.ITEM, 2);
 
 	// команды формы выбора
-	static final Command doneCmd = new Command("Готово", Command.OK, 1);
+	private static final Command doneCmd = new Command("Готово", Command.OK, 1);
 	private static final Command cancelCmd = new Command("Отмена", Command.CANCEL, 1);
 	private static final Command gpsCmd = new Command("Ближайший город", Command.ITEM, 2);
 //	private static final Command searchCmd = new Command("Поиск", Command.ITEM, 2);
@@ -168,12 +169,10 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		mainForm.addCommand(bookmarksCmd);
 		mainForm.addCommand(settingsCmd);
 		mainForm.addCommand(aboutCmd);
+		mainForm.addCommand(reverseCmd);
 		mainForm.setCommandListener(this);
 		transportChoice = new ChoiceGroup("Тип транспорта", Choice.POPUP, TRANSPORT_NAMES, null);
 		mainForm.append(transportChoice);
-		dateField = new DateField("Дата", DateField.DATE);
-		dateField.setDate(new Date());
-		mainForm.append(dateField);
 		fromBtn = new StringItem("Откуда", "Не выбрано", Item.BUTTON);
 		fromBtn.setLayout(Item.LAYOUT_EXPAND | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_NEWLINE_BEFORE);
 		fromBtn.addCommand(choosePointCmd);
@@ -186,6 +185,9 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		toBtn.setDefaultCommand(choosePointCmd);
 		toBtn.setItemCommandListener(this);
 		mainForm.append(toBtn);
+		dateField = new DateField("Дата", DateField.DATE);
+		dateField.setDate(new Date());
+		mainForm.append(dateField);
 		showTransfers = new ChoiceGroup("", Choice.MULTIPLE, new String[] { "С пересадками" }, null);
 		mainForm.append(showTransfers);
 		submitBtn = new StringItem(null, "Найти", StringItem.BUTTON);
@@ -391,51 +393,6 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			select((String) searchIds.elementAt(i), searchChoice.getString(i));
 			return;
 		}
-		if(c == aboutCmd) {
-			Form f = new Form("О программе");
-			f.addCommand(backCmd);
-			f.setCommandListener(this);
-			StringItem s;
-			try {
-				f.append(new ImageItem(null, Image.createImage("/icon.png"), Item.LAYOUT_LEFT, null));
-				s = new StringItem(null, "MahoRasp v" + this.getAppProperty("MIDlet-Version"));
-				s.setFont(Font.getFont(0, 0, Font.SIZE_LARGE));
-				s.setLayout(Item.LAYOUT_LEFT | Item.LAYOUT_VCENTER);
-				f.append(s);
-			} catch (IOException e) {
-			}
-			s = new StringItem(null, "J2ME клиент Яндекс.Расписаний\n\n");
-			s.setFont(Font.getDefaultFont());
-			s.setLayout(Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_LEFT);
-			f.append(s);
-			s = new StringItem("Разработал", "shinovon");
-			s.setLayout(Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_LEFT);
-			f.append(s);
-			s = new StringItem("Помогали", "sym_ansel\nMuseCat");
-			s.setLayout(Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_LEFT);
-			f.append(s);
-			s = new StringItem("Сайт", "nnp.nnchan.ru", Item.HYPERLINK);
-			s.setLayout(Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_LEFT);
-			s.setDefaultCommand(hyperlinkCmd);
-			s.setItemCommandListener(this);
-			f.append(s);
-			s = new StringItem("Донат", "boosty.to/nnproject/donate", Item.HYPERLINK);
-			s.setLayout(Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_LEFT);
-			s.setDefaultCommand(hyperlinkCmd);
-			s.setItemCommandListener(this);
-			f.append(s);
-			s = new StringItem("Чат", "t.me/nnmidletschat", Item.HYPERLINK);
-			s.setLayout(Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_LEFT);
-			s.setDefaultCommand(hyperlinkCmd);
-			s.setItemCommandListener(this);
-			f.append(s);
-			s = new StringItem(null, "\n292 labs");
-			s.setFont(Font.getDefaultFont());
-			s.setLayout(Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_LEFT);
-			f.append(s);
-			display(f);
-			return;
-		}
 		if(c == prevDayCmd) { // предыдущий день в форме результатов
 			if(running) return;
 			Date date = dateField.getDate();
@@ -526,6 +483,15 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			((List)d).addCommand(cancelCmd);
 			return;
 		}
+		if(c == reverseCmd) {
+			String tmp = from;
+			from = to;
+			to = tmp;
+			tmp = fromBtn.getText();
+			fromBtn.setText(toBtn.getText());
+			toBtn.setText(tmp);
+			return;
+		}
 		if(c == List.SELECT_COMMAND) { // выбрана закладка в списке
 			if(bookmarks == null) return;
 			int i = ((List)d).getSelectedIndex();
@@ -561,6 +527,50 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			}
 			display(mainForm);
 //			commandAction(submitCmd, d);
+			return;
+		}
+		if(c == aboutCmd) {
+			Form f = new Form("О программе");
+			f.addCommand(backCmd);
+			f.setCommandListener(this);
+			StringItem s;
+			try {
+				f.append(new ImageItem(null, Image.createImage("/icon.png"), Item.LAYOUT_LEFT, null));
+				s = new StringItem(null, "MahoRasp v" + getAppProperty("MIDlet-Version"));
+				s.setFont(Font.getFont(0, 0, Font.SIZE_LARGE));
+				s.setLayout(Item.LAYOUT_LEFT | Item.LAYOUT_VCENTER);
+				f.append(s);
+			} catch (IOException e) {
+			}
+			s = new StringItem(null, "J2ME клиент Яндекс.Расписаний\n\n");
+			s.setFont(Font.getDefaultFont());
+			s.setLayout(Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_LEFT);
+			f.append(s);
+			s = new StringItem("Разработал", "shinovon");
+			s.setLayout(Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_LEFT);
+			f.append(s);
+			s = new StringItem("Помогали", "sym_ansel\nMuseCat");
+			s.setLayout(Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_LEFT);
+			f.append(s);
+			s = new StringItem("Сайт", "nnp.nnchan.ru", Item.HYPERLINK);
+			s.setLayout(Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_LEFT);
+			s.setDefaultCommand(hyperlinkCmd);
+			s.setItemCommandListener(this);
+			f.append(s);
+			s = new StringItem("Донат", "boosty.to/nnproject/donate", Item.HYPERLINK);
+			s.setLayout(Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_LEFT);
+			s.setDefaultCommand(hyperlinkCmd);
+			s.setItemCommandListener(this);
+			f.append(s);
+			s = new StringItem("Чат", "t.me/nnmidletschat", Item.HYPERLINK);
+			s.setLayout(Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_LEFT);
+			s.setDefaultCommand(hyperlinkCmd);
+			s.setItemCommandListener(this);
+			f.append(s);
+			s = new StringItem(null, "\n292 labs");
+			s.setLayout(Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_LEFT);
+			f.append(s);
+			display(f);
 			return;
 		}
 	}
@@ -635,8 +645,9 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				if(seg.has("details")) {
 					JSONArray details = seg.getArray("details");
 					int i = 0;
-					for(Enumeration e = details.elements(); e.hasMoreElements(); ) {
-						JSONObject n = (JSONObject) e.nextElement();
+					int l = details.size();
+					for(int j = 0; j < l; j++) {
+						JSONObject n = details.getObject(j);
 						if(n.has("thread")) {
 							JSONObject th = n.getObject("thread");
 							f.append(new ImageItem(null, transportImg(types.getString(i)), Item.LAYOUT_LEFT, null));
@@ -718,20 +729,19 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				if((o = seg.getNullableObject("tickets_info")) != null) {
 					String r = "Цена:\n";
 					JSONArray places = o.getArray("places");
-					if(places.size() > 0) {
-						for(Enumeration e = places.elements(); e.hasMoreElements();) {
-							JSONObject p = (JSONObject) e.nextElement();
-							String name = p.getString("name");
-							JSONObject price = p.getObject("price");
-							if(name != null) {
-								r += name + ": ";
-							}
-							r += price.getInt("whole") + "." + price.getInt("cents") + " " + p.getString("currency") + "\n";
+					int i = places.size();
+					for(int j = 0; j < i; j++) {
+						JSONObject p = places.getObject(j);
+						String name = p.getString("name");
+						JSONObject price = p.getObject("price");
+						if(name != null) {
+							r += name + ": ";
 						}
-						s = new StringItem(null, r + "\n");
-						s.setFont(smallfont);
-						f.append(s);
+						r += price.getInt("whole") + "." + price.getInt("cents") + " " + p.getString("currency") + "\n";
 					}
+					s = new StringItem(null, r + "\n");
+					s.setFont(smallfont);
+					f.append(s);
 				}
 				if((m = thread.getNullableString("vehicle")) != null && m.length() > 0) {
 					s = new StringItem(null, m + "\n");
@@ -866,8 +876,9 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				}
 				l.addCommand(removeBookmarkCmd);
 				l.addCommand(moveBookmarkCmd);
-				for(Enumeration e = bookmarks.elements(); e.hasMoreElements();) {
-					JSONObject bm = (JSONObject) e.nextElement();
+				int i = bookmarks.size();
+				for(int j = 0; j < i; j++) {
+					JSONObject bm = bookmarks.getObject(j);
 					l.append(bm.has("n") ? bm.getString("n") : bm.getString("c") + " - " + bm.getString("d"), null);
 				}
 			} catch (Exception e) {
@@ -1004,7 +1015,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		} catch (Exception e) {}
 	}
 	
-	private void select(String code, String title) {
+	private static void select(String code, String title) {
 		searchForm = null;
 		searchField = null;
 		searchChoice = null;
@@ -1393,9 +1404,6 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	
 	static final boolean parse_members = false;
 	
-	// identation for formatting
-	static final String FORMAT_TAB = "  ";
-	
 	// used for storing nulls, get methods must return real null
 	public static final Object json_null = new Object();
 	
@@ -1426,82 +1434,84 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		case '"': { // string
 			if (last != '"')
 				throw new RuntimeException("JSON: Unexpected end of text");
-			char[] chars = str.substring(1, length).toCharArray();
-			str = null;
-			int l = chars.length;
-			StringBuffer sb = new StringBuffer();
-			int i = 0;
-			// parse escaped chars in string
-			loop: {
-				while (i < l) {
-					char c = chars[i];
-					switch (c) {
-					case '\\': {
-						next: {
-							replace: {
-								if (l < i + 1) {
-									sb.append(c);
-									break loop;
+			if(str.indexOf('\\') != -1) {
+				char[] chars = str.substring(1, length).toCharArray();
+				str = null;
+				int l = chars.length;
+				StringBuffer sb = new StringBuffer();
+				int i = 0;
+				// parse escaped chars in string
+				loop: {
+					while (i < l) {
+						char c = chars[i];
+						switch (c) {
+						case '\\': {
+							next: {
+								replace: {
+									if (l < i + 1) {
+										sb.append(c);
+										break loop;
+									}
+									char c1 = chars[i + 1];
+									switch (c1) {
+									case 'u':
+										i+=2;
+										sb.append((char) Integer.parseInt(
+												new String(new char[] {chars[i++], chars[i++], chars[i++], chars[i++]}),
+												16));
+										break replace;
+									case 'x':
+										i+=2;
+										sb.append((char) Integer.parseInt(
+												new String(new char[] {chars[i++], chars[i++]}),
+												16));
+										break replace;
+									case 'n':
+										sb.append('\n');
+										i+=2;
+										break replace;
+									case 'r':
+										sb.append('\r');
+										i+=2;
+										break replace;
+									case 't':
+										sb.append('\t');
+										i+=2;
+										break replace;
+									case 'f':
+										sb.append('\f');
+										i+=2;
+										break replace;
+									case 'b':
+										sb.append('\b');
+										i+=2;
+										break replace;
+									case '\"':
+									case '\'':
+									case '\\':
+									case '/':
+										i+=2;
+										sb.append((char) c1);
+										break replace;
+									default:
+										break next;
+									}
 								}
-								char c1 = chars[i + 1];
-								switch (c1) {
-								case 'u':
-									i+=2;
-									sb.append((char) Integer.parseInt(
-											new String(new char[] {chars[i++], chars[i++], chars[i++], chars[i++]}),
-											16));
-									break replace;
-								case 'x':
-									i+=2;
-									sb.append((char) Integer.parseInt(
-											new String(new char[] {chars[i++], chars[i++]}),
-											16));
-									break replace;
-								case 'n':
-									sb.append('\n');
-									i+=2;
-									break replace;
-								case 'r':
-									sb.append('\r');
-									i+=2;
-									break replace;
-								case 't':
-									sb.append('\t');
-									i+=2;
-									break replace;
-								case 'f':
-									sb.append('\f');
-									i+=2;
-									break replace;
-								case 'b':
-									sb.append('\b');
-									i+=2;
-									break replace;
-								case '\"':
-								case '\'':
-								case '\\':
-								case '/':
-									i+=2;
-									sb.append((char) c1);
-									break replace;
-								default:
-									break next;
-								}
+								break;
 							}
+							sb.append(c);
+							i++;
 							break;
 						}
-						sb.append(c);
-						i++;
-						break;
-					}
-					default:
-						sb.append(c);
-						i++;
+						default:
+							sb.append(c);
+							i++;
+						}
 					}
 				}
+				str = sb.toString();
+				sb = null;
 			}
-			str = sb.toString();
-			sb = null;
 			return str;
 		}
 		case '{': // JSON object or array
@@ -1584,11 +1594,6 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 						return new Integer(Integer.parseInt(str.substring(2), 16));
 					}
 					// decimal
-					if (str.indexOf('.') != -1 || str.indexOf('E') != -1 || "-0".equals(str))
-						return new Double(Double.parseDouble(str));
-					if (first == '-') length--;
-					if (length > 8) // (str.length() - (str.charAt(0) == '-' ? 1 : 0)) >= 10
-						return new Long(Long.parseLong(str));
 					return new Integer(Integer.parseInt(str));
 				} catch (Exception e) {}
 			}
@@ -1653,20 +1658,6 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				return ((Double) o).intValue();
 		} catch (Throwable e) {}
 		throw new RuntimeException("JSON: Cast to int failed: " + o);
-	}
-
-	static long getLong(Object o) {
-		try {
-			if (o instanceof String[])
-				return Long.parseLong(((String[]) o)[0]);
-			if (o instanceof Integer)
-				return ((Integer) o).longValue();
-			if (o instanceof Long)
-				return ((Long) o).longValue();
-			if (o instanceof Double)
-				return ((Double) o).longValue();
-		} catch (Throwable e) {}
-		throw new RuntimeException("JSON: Cast to long failed: " + o);
 	}
 
 }
