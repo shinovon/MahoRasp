@@ -20,20 +20,333 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-import java.util.Enumeration;
-import java.util.Vector;
 
-//Modified version of org.nnproject.json
-public class JSONArray {
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Enumeration;
+import java.util.Hashtable;
+
+public class JSON extends InputStream {
+
+	// JSONObject
+	
+	protected Hashtable table;
+
+	public JSON(Hashtable table) {
+		this.table = table == null ? new Hashtable() : table;
+	}
+	
+	public Object get(String name) {
+		try {
+			if (has(name)) {
+				Object o = table.get(name);
+				if (o instanceof String[])
+					table.put(name, o = MahoRaspApp2.parseJSON(((String[]) o)[0]));
+				if (o == MahoRaspApp2.json_null)
+					return null;
+				return o;
+			}
+		} catch (RuntimeException e) {
+			throw e;
+		} catch (Exception e) {
+		}
+		throw new RuntimeException("JSON: No value for name: " + name);
+	}
+	
+	public Object get(String name, Object def) {
+		if (!has(name)) return def;
+		try {
+			return get(name);
+		} catch (Exception e) {
+			return def;
+		}
+	}
+	
+	public Object getNullable(String name) {
+		return get(name, null);
+	}
+	
+	public String getString(String name) {
+		Object o = get(name);
+		if (o == null || o instanceof String)
+			return (String) o;
+		return String.valueOf(o);
+	}
+	
+	public String getString(String name, String def) {
+		try {
+			Object o = get(name, def);
+			if (o == null || o instanceof String)
+				return (String) o;
+			return String.valueOf(o);
+		} catch (Exception e) {
+			return def;
+		}
+	}
+	
+	public String getNullableString(String name) {
+		return getString(name, null);
+	}
+	
+	public JSON getObject(String name) {
+		try {
+			JSON o = (JSON) get(name);
+			if(o.table != null)
+				return o;
+		} catch (ClassCastException e) {
+		}
+		throw new RuntimeException("JSON: Not object: " + name);
+	}
+	public JSON getObject(String name, JSON def) {
+		if (has(name)) {
+			try {
+				return (JSON) get(name);
+			} catch (Exception e) {
+			}
+		}
+		return def;
+	}
+	
+	public JSON getNullableObject(String name) {
+		return getObject(name, null);
+	}
+	
+	public JSON getArray(String name) {
+		try {
+			JSON o = (JSON) get(name);
+			if(o.elements != null)
+				return o;
+		} catch (ClassCastException e) {
+		}
+		throw new RuntimeException("JSON: Not array: " + name);
+	}
+	
+	public JSON getArray(String name, JSON def) {
+		if (has(name)) {
+			try {
+				return (JSON) get(name);
+			} catch (Exception e) {
+			}
+		}
+		return def;
+	}
+	
+	
+	public JSON getNullableArray(String name) {
+		return getArray(name, null);
+	}
+	
+	public int getInt(String name) {
+		return MahoRaspApp2.getInt(get(name));
+	}
+	
+	public int getInt(String name, int def) {
+		if (!has(name)) return def;
+		try {
+			return getInt(name);
+		} catch (Exception e) {
+			return def;
+		}
+	}
+	
+	public boolean getBoolean(String name) {
+		Object o = get(name);
+		if (o == MahoRaspApp2.TRUE) return true;
+		if (o == MahoRaspApp2.FALSE) return false;
+		if (o instanceof Boolean) return ((Boolean) o).booleanValue();
+		if (o instanceof String) {
+			String s = (String) o;
+			s = s.toLowerCase();
+			if (s.equals("true")) return true;
+			if (s.equals("false")) return false;
+		}
+		throw new RuntimeException("JSON: Not boolean: " + o);
+	}
+
+	public boolean getBoolean(String name, boolean def) {
+		if (!has(name)) return def;
+		try {
+			return getBoolean(name);
+		} catch (Exception e) {
+			return def;
+		}
+	}
+	
+	public boolean isNull(String name) {
+		if (!has(name))
+			throw new RuntimeException("JSON: No value for name: " + name);
+		return table.get(name) == MahoRaspApp2.json_null;
+	}
+	
+	public void put(String name, Object obj) {
+		table.put(name, obj);
+	}
+	
+	public void put(String name, String s) {
+		table.put(name, s);
+	}
+
+	public void put(String name, int i) {
+		table.put(name, new Integer(i));
+	}
+
+	public void put(String name, long l) {
+		table.put(name, new Long(l));
+	}
+
+	public void put(String name, double d) {
+		table.put(name, new Double(d));
+	}
+
+	public void put(String name, boolean b) {
+		table.put(name, new Boolean(b));
+	}
+	
+	public boolean hasValue(Object object) {
+		return table.contains(object);
+	}
+	
+	// hasKey
+	public boolean has(String name) {
+		return table.containsKey(name);
+	}
+	
+	public void clear() {
+		if(table != null) {
+			table.clear();
+			return;
+		}
+		for (int i = 0; i < count; i++) elements[i] = null;
+		count = 0;
+	}
+	
+	public void remove(String name) {
+		table.remove(name);
+	}
+	
+	public int size() {
+		return table != null ? table.size() : count;
+	}
+	
+	public boolean isEmpty() {
+		return table != null ? table.isEmpty() : count == 0;
+	}
+	
+	public String toString() {
+		return build();
+	}
+	
+	public boolean equals(Object obj) {
+		return this == obj || super.equals(obj);
+	}
+
+	public String build() {
+		if(table != null) {
+			if (size() == 0)
+				return "{}";
+			StringBuffer s = new StringBuffer("{");
+			Enumeration keys = table.keys();
+			while (true) {
+				String k = (String) keys.nextElement();
+				s.append("\"").append(k).append("\":");
+				Object v = table.get(k);
+				if (v instanceof JSON) {
+					s.append(((JSON) v).build());
+				} else if (v instanceof JSON) {
+					s.append(((JSON) v).build());
+				} else if (v instanceof String) {
+					s.append("\"").append(MahoRaspApp2.escape_utf8((String) v)).append("\"");
+				} else if (v == MahoRaspApp2.json_null) {
+					s.append((String) null);
+				} else {
+					s.append(v);
+				}
+				if (!keys.hasMoreElements()) {
+					break;
+				}
+				s.append(",");
+			}
+			s.append("}");
+			return s.toString();
+		}
+		int size = count;
+		if (size == 0)
+			return "[]";
+		StringBuffer s = new StringBuffer("[");
+		int i = 0;
+		while (i < size) {
+			Object v = elements[i];
+			if (v instanceof JSON) {
+				s.append(((JSON) v).build());
+			} else if (v instanceof JSON) {
+				s.append(((JSON) v).build());
+			} else if (v instanceof String) {
+				s.append("\"").append(MahoRaspApp2.escape_utf8((String) v)).append("\"");
+			} else if (v == MahoRaspApp2.json_null) {
+				s.append((String) null);
+			} else {
+				s.append(String.valueOf(v));
+			}
+			i++;
+			if (i < size) {
+				s.append(",");
+			}
+		}
+		s.append("]");
+		return s.toString();
+	}
+
+	public Enumeration keys() {
+		return table.keys();
+	}
+
+	public JSON keysAsArray() {
+		JSON array = new JSON(table.size());
+		Enumeration keys = table.keys();
+		while (keys.hasMoreElements()) {
+			array.addElement(keys.nextElement());
+		}
+		return array;
+	}
+	
+	void _put(String name, Object obj) {
+		table.put(name, obj);
+	}
+	
+	// FilterStream
+	
+	private InputStream in;
+	
+	JSON(InputStream stream) {
+		in = stream;
+	}
+
+	public int read() throws IOException {
+		return in.read();
+	}
+
+	public int read(byte[] b) throws IOException {
+		return in.read(b);
+	}
+
+	public int read(byte[] b, int offset, int length) throws IOException {
+		return in.read(b, offset, length);
+	}
+
+	public long skip(long n) throws IOException {
+		return in.skip(n);
+	}
+
+	public int available() throws IOException {
+		return in.available();
+	}
+	
+	// JSONArray
 	
 	protected Object[] elements;
 	protected int count;
 	
-	public JSONArray() {
-		elements = new Object[10];
-	}
-	
-	public JSONArray(int size) {
+	public JSON(int size) {
 		elements = new Object[size];
 	}
 
@@ -91,15 +404,15 @@ public class JSONArray {
 		return getString(index, null);
 	}
 	
-	public JSONObject getObject(int index) {
+	public JSON getObject(int index) {
 		try {
-			return (JSONObject) get(index);
+			return (JSON) get(index);
 		} catch (ClassCastException e) {
 			throw new RuntimeException("JSON: Not object at " + index);
 		}
 	}
 	
-	public JSONObject getObject(int index, JSONObject def) {
+	public JSON getObject(int index, JSON def) {
 		try {
 			return getObject(index);
 		} catch (Exception e) {
@@ -107,19 +420,19 @@ public class JSONArray {
 		return def;
 	}
 	
-	public JSONObject getNullableObject(int index) {
+	public JSON getNullableObject(int index) {
 		return getObject(index, null);
 	}
 	
-	public JSONArray getArray(int index) {
+	public JSON getArray(int index) {
 		try {
-			return (JSONArray) get(index);
+			return (JSON) get(index);
 		} catch (ClassCastException e) {
 			throw new RuntimeException("JSON: Not array at " + index);
 		}
 	}
 	
-	public JSONArray getArray(int index, JSONArray def) {
+	public JSON getArray(int index, JSON def) {
 		try {
 			return getArray(index);
 		} catch (Exception e) {
@@ -127,7 +440,7 @@ public class JSONArray {
 		return def;
 	}
 	
-	public JSONArray getNullableArray(int index) {
+	public JSON getNullableArray(int index) {
 		return getArray(index, null);
 	}
 	
@@ -290,11 +603,6 @@ public class JSONArray {
 		return _indexOf(object, index);
 	}
 	
-	public void clear() {
-		for (int i = 0; i < count; i++) elements[i] = null;
-		count = 0;
-	}
-	
 	public boolean remove(Object object) {
 		int i = _indexOf(object, 0);
 		if (i == -1) return false;
@@ -311,50 +619,6 @@ public class JSONArray {
 		if (size > 0)
 			System.arraycopy(elements, index + 1, elements, index, size);
 		elements[count] = null;
-	}
-	
-	public int size() {
-		return count;
-	}
-	
-	public boolean isEmpty() {
-		return count == 0;
-	}
-	
-	public String toString() {
-		return build();
-	}
-	
-	public boolean equals(Object obj) {
-		return this == obj || super.equals(obj);
-	}
-
-	public String build() {
-		int size = count;
-		if (size == 0)
-			return "[]";
-		StringBuffer s = new StringBuffer("[");
-		int i = 0;
-		while (i < size) {
-			Object v = elements[i];
-			if (v instanceof JSONArray) {
-				s.append(((JSONArray) v).build());
-			} else if (v instanceof JSONObject) {
-				s.append(((JSONObject) v).build());
-			} else if (v instanceof String) {
-				s.append("\"").append(MahoRaspApp2.escape_utf8((String) v)).append("\"");
-			} else if (v == MahoRaspApp2.json_null) {
-				s.append((String) null);
-			} else {
-				s.append(String.valueOf(v));
-			}
-			i++;
-			if (i < size) {
-				s.append(",");
-			}
-		}
-		s.append("]");
-		return s.toString();
 	}
 
 	public Enumeration elements() {
@@ -385,23 +649,6 @@ public class JSONArray {
 		while(i < arr.length && j < length && j < size()) {
 			arr[i++] = get(j++);
 		}
-	}
-
-	public Vector toVector() {
-		int size = count;
-		Vector copy = new Vector(size);
-		for (int i = 0; i < size; i++) {
-			Object o = elements[i];
-			if (o instanceof String[])
-				o = elements[i] = MahoRaspApp2.parseJSON(((String[]) o)[0]);
-			if (o instanceof JSONObject) {
-				o = ((JSONObject) o).toTable();
-			} else if (o instanceof JSONArray) {
-				o = ((JSONArray) o).toVector();
-			}
-			copy.addElement(o);
-		}
-		return copy;
 	}
 
 	void addElement(Object object) {

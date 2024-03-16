@@ -128,7 +128,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static String from;
 	private static String to;
 
-	private static JSONObject result;
+	private static JSON result;
 	private static Hashtable items = new Hashtable();
 	private static int selectedItem;
 	private static String resultTitle;
@@ -148,7 +148,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static InputStreamReader searchReader;
 	private static boolean searchCancel;
 	
-	private static JSONArray bookmarks;
+	private static JSON bookmarks;
 	private static int movingBookmark = -1;
 
 	private static Object locationProvider;
@@ -223,7 +223,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		try {
 			// загрузка настроек
 			RecordStore r = RecordStore.openRecordStore(SETTINGS_RECORDNAME, false);
-			JSONObject j = getObject(new String(r.getRecord(1), "UTF-8"));
+			JSON j = getObject(new String(r.getRecord(1), "UTF-8"));
 			r.closeRecordStore();
 			timezone = j.getString("tz", timezone);
 			timezoneMode = j.getInt("tzm", timezoneMode);
@@ -295,7 +295,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				} catch (Exception e) {
 				}
 				try {
-					JSONObject j = new JSONObject();
+					JSON j = new JSON((Hashtable) null);
 					j.put("tz", timezone);
 					j.put("tzm", timezoneMode);
 //					j.put("proxy", proxy);
@@ -431,18 +431,18 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 					bookmarks = getArray(new String(r.getRecord(1), "UTF-8"));
 					r.closeRecordStore();
 				} catch (Exception e) {
-					bookmarks = new JSONArray();
+					bookmarks = new JSON(10);
 				}
 			} else {
 				// есть ли уже такая закладка
 				int l = bookmarks.size();
 				for(int i = 0; i < l; i++) {
-					JSONObject j = bookmarks.getObject(i);
+					JSON j = bookmarks.getObject(i);
 					if(j.getInt("t") == BOOKMARK_CITIES && fn.equals(j.getString("c")) && tn.equals(j.getString("d"))) return;  
 				}
 			}
 			
-			JSONObject bm = new JSONObject();
+			JSON bm = new JSON((Hashtable) null);
 			bm.put("t", BOOKMARK_CITIES);
 			bm.put("a", from);
 			bm.put("b", to);
@@ -504,7 +504,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 					((List)d).addCommand(removeBookmarkCmd);
 					((List)d).addCommand(moveBookmarkCmd);
 					((List)d).addCommand(backCmd);
-					JSONObject bm = bookmarks.getObject(j);
+					JSON bm = bookmarks.getObject(j);
 					bookmarks.remove(j);
 					bookmarks.put(i, bm);
 					String s = ((List)d).getString(j);
@@ -513,7 +513,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				}
 				return;
 			}
-			JSONObject bm = bookmarks.getObject(i);
+			JSON bm = bookmarks.getObject(i);
 			switch(bm.getInt("t")) {
 			case BOOKMARK_CITIES:
 //			case BOOKMARK_STATIONS:
@@ -633,23 +633,23 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			Form f = new Form("");
 			f.addCommand(backCmd);
 			f.setCommandListener(this);
-			JSONObject seg = result.getArray("segments").getObject(selectedItem);
+			JSON seg = result.getArray("segments").getObject(selectedItem);
 			
 			if(seg.getBoolean("has_transfers")) { // есть пересадки
-				JSONArray types = seg.getArray("transport_types");
+				JSON types = seg.getArray("transport_types");
 				String title = seg.getObject("departure_from").getString("title") + " - " + seg.getObject("arrival_to").getString("title");
 				f.setTitle(title);
 				StringItem t = new StringItem(null, title + "\n");
 				t.setFont(Font.getFont(0, 0, Font.SIZE_LARGE));
 				f.append(t);
 				if(seg.has("details")) {
-					JSONArray details = seg.getArray("details");
+					JSON details = seg.getArray("details");
 					int i = 0;
 					int l = details.size();
 					for(int j = 0; j < l; j++) {
-						JSONObject n = details.getObject(j);
+						JSON n = details.getObject(j);
 						if(n.has("thread")) {
-							JSONObject th = n.getObject("thread");
+							JSON th = n.getObject("thread");
 							f.append(new ImageItem(null, transportImg(types.getString(i)), Item.LAYOUT_LEFT, null));
 							StringItem s2 = new StringItem(null, th.getString("number") + " " + th.getString("title") + "\n\n");
 							s2.setFont(Font.getFont(0, 0, Font.SIZE_MEDIUM));
@@ -692,7 +692,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 					}
 				}
 			} else { // нет пересадок
-				JSONObject thread = seg.getObject("thread");
+				JSON thread = seg.getObject("thread");
 				f.append(new ImageItem(null, transportImg(thread.getString("transport_type")), Item.LAYOUT_LEFT, null));
 				String title = thread.getString("number") + " " + thread.getString("title");
 				f.setTitle(title);
@@ -725,15 +725,15 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 					s.setFont(smallfont);
 					f.append(s);
 				}
-				JSONObject o;
+				JSON o;
 				if((o = seg.getNullableObject("tickets_info")) != null) {
 					String r = "Цена:\n";
-					JSONArray places = o.getArray("places");
+					JSON places = o.getArray("places");
 					int i = places.size();
 					for(int j = 0; j < i; j++) {
-						JSONObject p = places.getObject(j);
+						JSON p = places.getObject(j);
 						String name = p.getString("name");
-						JSONObject price = p.getObject("price");
+						JSON price = p.getObject("price");
 						if(name != null) {
 							r += name + ": ";
 						}
@@ -878,7 +878,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				l.addCommand(moveBookmarkCmd);
 				int i = bookmarks.size();
 				for(int j = 0; j < i; j++) {
-					JSONObject bm = bookmarks.getObject(j);
+					JSON bm = bookmarks.getObject(j);
 					l.append(bm.has("n") ? bm.getString("n") : bm.getString("c") + " - " + bm.getString("d"), null);
 				}
 			} catch (Exception e) {
@@ -897,7 +897,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		case RUN_NEAREST_CITY: { // запросить ближайший город, координаты уже получены
 			display(loadingAlert("Загрузка"), searchForm);
 			try {
-				JSONObject r = api("nearest_settlement/?lat=" + gpslat + "&lng=" + gpslon);
+				JSON r = api("nearest_settlement/?lat=" + gpslat + "&lng=" + gpslon);
 				if(r.has("title") && r.has("code")) {
 					select(r.getString("code"), r.getString("title"));
 					break;
@@ -919,7 +919,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		running = false;
 	}
 
-	private String point(JSONObject o) {
+	private String point(JSON o) {
 		if("station".equals(o.getString("type"))) { // если станция, добавить её тип
 			return o.getString("title") + " (" + o.getString("station_type_name") + ")";
 		}
@@ -931,7 +931,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		cal.setTime(dateField.getDate());
 		long time = System.currentTimeMillis();
 		Calendar now = getLocalizedTime(time);
-		JSONObject search = result.getObject("search");
+		JSON search = result.getObject("search");
 		String title = search.getObject("from").getString("title") + " - " + search.getObject("to").getString("title");
 		resultTitle = title;
 		StringItem titleItem = new StringItem(n(cal.get(Calendar.DAY_OF_MONTH)) + "." + n(cal.get(Calendar.MONTH) + 1) + "." + cal.get(Calendar.YEAR), title + "\n");
@@ -942,14 +942,14 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		left.setLayout(Item.LAYOUT_LEFT | Item.LAYOUT_NEWLINE_BEFORE | Item.LAYOUT_NEWLINE_AFTER);
 		int idx = resultForm.append(left);
 		
-		JSONArray segments = result.getArray("segments");
+		JSON segments = result.getArray("segments");
 		int size = segments.size();
 		if(size == 0) {
 			left.setText("Пусто!");
 		}
 		int goneCount = 0;
 		for(int i = 0; i < size; i++) {
-			JSONObject seg = segments.getObject(i);
+			JSON seg = segments.getObject(i);
 			Calendar departure = getLocalizedDate(seg.getString("departure"));
 			if(!showGone && oneDay(now, departure) && parseDateGMT(seg.getString("departure")) < time) {
 				goneCount++;
@@ -958,16 +958,16 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			Calendar arrival = getLocalizedDate(seg.getString("arrival"));
 			String r = "";
 			if(seg.getBoolean("has_transfers")) {
-				JSONArray types = seg.getArray("transport_types");
+				JSON types = seg.getArray("transport_types");
 				for(int j = 0; j < types.size(); j++) {
 					resultForm.append(new ImageItem(null, transportImg(types.getString(j)), Item.LAYOUT_LEFT, null));
 				}
-				JSONObject from = seg.getObject("departure_from");
-				JSONObject to = seg.getObject("arrival_to");
+				JSON from = seg.getObject("departure_from");
+				JSON to = seg.getObject("arrival_to");
 				r += from.getString("title") + " - " + to.getString("title") + "\n";
 				r += "с пересадками\n";
 			} else {
-				JSONObject thread = seg.getObject("thread");
+				JSON thread = seg.getObject("thread");
 				r += thread.getString("number") + " " + thread.getString("title") + "\n";
 				resultForm.append(new ImageItem(null, transportImg(thread.getString("transport_type")), Item.LAYOUT_LEFT | Item.LAYOUT_NEWLINE_BEFORE, null));
 			}
@@ -1047,18 +1047,18 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			try {
 				// попытка ресетнуть поток
 				stream.reset();
-				return new InputStreamReader(new FilterStream(stream), "UTF-8");
+				return new InputStreamReader(new JSON(stream), "UTF-8");
 			} catch (Exception e) {
 				// не получилось, переоткрываем
 				try {
 					stream.close();
 				} catch (IOException e2) {}
 				stream = getClass().getResourceAsStream("/cities");
-				return new InputStreamReader(new FilterStream(stream), "UTF-8");
+				return new InputStreamReader(new JSON(stream), "UTF-8");
 			}
 		}
 		stream = getClass().getResourceAsStream("/cities");
-		return new InputStreamReader(new FilterStream(stream), "UTF-8");
+		return new InputStreamReader(new JSON(stream), "UTF-8");
 	}
 	
 	private static void runGPS() {
@@ -1387,12 +1387,12 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		return new String(get(url), "UTF-8");
 	}
 
-	static JSONObject api(String url) throws Exception {
+	static JSON api(String url) throws Exception {
 //		url = "http://api.rasp.yandex.net/v3.0/" + url + (!url.endsWith("?") ? "&" : "") + "apikey=" + APIKEY + "&format=json&lang=ru_RU";
 //		if (proxy)
 //			url = "http://nnp.nnchan.ru:80/hproxy.php?u=" + url(url);
 		String r = getUtf("http://api.rasp.yandex.net/v3.0/" + url + (!url.endsWith("?") ? "&" : "") + "apikey=" + APIKEY + "&format=json&lang=ru_RU");
-		JSONObject j = getObject(r);
+		JSON j = getObject(r);
 		if(j.has("error")) {
 			// выбрасывать эксепшн с текстом ошибки
 			throw new Exception(j.getObject("error").getString("text"));
@@ -1410,20 +1410,20 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	public static final Boolean TRUE = new Boolean(true);
 	public static final Boolean FALSE = new Boolean(false);
 
-	public static JSONObject getObject(String text) {
+	public static JSON getObject(String text) {
 		if (text == null || text.length() <= 1)
 			throw new RuntimeException("JSON: Empty text");
 		if (text.charAt(0) != '{')
 			throw new RuntimeException("JSON: Not JSON object");
-		return (JSONObject) parseJSON(text);
+		return (JSON) parseJSON(text);
 	}
 
-	public static JSONArray getArray(String text) {
+	public static JSON getArray(String text) {
 		if (text == null || text.length() <= 1)
 			throw new RuntimeException("JSON: Empty text");
 		if (text.charAt(0) != '[')
 			throw new RuntimeException("JSON: Not JSON array");
-		return (JSONArray) parseJSON(text);
+		return (JSON) parseJSON(text);
 	}
 
 	static Object parseJSON(String str) {
@@ -1524,7 +1524,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			char nextDelimiter = object ? ':' : ',';
 			boolean escape = false;
 			String key = null;
-			Object res = object ? (Object) new JSONObject() : (Object) new JSONArray();
+			Object res = object ? (Object) new JSON((Hashtable) null) : (Object) new JSON(10);
 			
 			for (int splIndex; i < length; i = splIndex + 1) {
 				// skip all spaces
@@ -1568,11 +1568,11 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 					value = parse_members || (c != '{' && c != '[') ?
 							parseJSON((String) value) : new String[] {(String) value};
 					if (object) {
-						((JSONObject) res)._put(key, value);
+						((JSON) res)._put(key, value);
 						key = null;
 						nextDelimiter = ':';
 					} else if (splIndex > i) {
-						((JSONArray) res).addElement(value);
+						((JSON) res).addElement(value);
 					}
 				}
 			}
@@ -1589,8 +1589,6 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				try {
 					// hex
 					if (length > 1 && first == '0' && str.charAt(1) == 'x') {
-						if (length > 9) // str.length() > 10
-							return new Long(Long.parseLong(str.substring(2), 16));
 						return new Integer(Integer.parseInt(str.substring(2), 16));
 					}
 					// decimal
