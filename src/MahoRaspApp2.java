@@ -919,14 +919,14 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		running = false;
 	}
 
-	private String point(JSON o) {
+	private static String point(JSON o) {
 		if("station".equals(o.getString("type"))) { // если станция, добавить её тип
 			return o.getString("title") + " (" + o.getString("station_type_name") + ")";
 		}
 		return o.getString("title");
 	}
 
-	private void parseResults() {
+	private static void parseResults() {
 		Calendar cal = Calendar.getInstance();
 		cal.setTime(dateField.getDate());
 		long time = System.currentTimeMillis();
@@ -976,7 +976,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			StringItem s = new StringItem("", r + "\n");
 			s.addCommand(itemCmd);
 			s.setDefaultCommand(itemCmd);
-			s.setItemCommandListener(this);
+			s.setItemCommandListener(midlet);
 			s.setLayout(Item.LAYOUT_LEFT | Item.LAYOUT_NEWLINE_AFTER);
 			items.put(s, new Integer(i));
 			resultForm.append(s);
@@ -987,7 +987,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			showGoneBtn.setLayout(Item.LAYOUT_EXPAND | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_NEWLINE_BEFORE);
 			showGoneBtn.addCommand(showGoneCmd);
 			showGoneBtn.setDefaultCommand(showGoneCmd);
-			showGoneBtn.setItemCommandListener(this);
+			showGoneBtn.setItemCommandListener(midlet);
 			resultForm.insert(idx, showGoneBtn);
 		}
 	}
