@@ -1590,14 +1590,20 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				try {
 					// hex
 					if (length > 1 && first == '0' && str.charAt(1) == 'x') {
+						if (length > 9) // str.length() > 10
+							return new Long(Long.parseLong(str.substring(2), 16));
 						return new Integer(Integer.parseInt(str.substring(2), 16));
 					}
 					// decimal
+					if (str.indexOf('.') != -1 || str.indexOf('E') != -1 || "-0".equals(str))
+						return new Double(Double.parseDouble(str));
+					if (first == '-') length--;
+					if (length > 8) // (str.length() - (str.charAt(0) == '-' ? 1 : 0)) >= 10
+						return new Long(Long.parseLong(str));
 					return new Integer(Integer.parseInt(str));
 				} catch (Exception e) {}
 			}
 			throw new RuntimeException("JSON: Couldn't be parsed: " + str);
-//			return new String[](str);
 		}
 	}
 
