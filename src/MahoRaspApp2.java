@@ -161,6 +161,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static String timezone;
 	private static int timezoneMode;
 //	private static boolean proxy;
+	
+	private static boolean s60v3;
 
 	public MahoRaspApp2() {
 		midlet = this;
@@ -208,6 +210,11 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		if(started) return;
 		started = true;
 		display = Display.getDisplay(this);
+		try {
+			s60v3 = System.getProperty("com.symbian.midp.serversocket.support") != null ||
+					System.getProperty("com.symbian.default.to.suite.icon") != null
+					|| System.getProperty("microedition.platform").indexOf("platform_version=5.") == -1;
+		} catch (Exception e) {}
 		try {
 			// загрузка иконок
 			planeImg = Image.createImage("/plane.png");
@@ -960,7 +967,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			if(seg.getBoolean("has_transfers")) {
 				JSON types = seg.getArray("transport_types");
 				for(int j = 0; j < types.size(); j++) {
-					resultForm.append(new ImageItem(null, transportImg(types.getString(j)), Item.LAYOUT_LEFT, null));
+					ImageItem img = new ImageItem(null, transportImg(types.getString(j)), Item.LAYOUT_LEFT, null);
+					resultForm.append(img);
 				}
 				JSON from = seg.getObject("departure_from");
 				JSON to = seg.getObject("arrival_to");
@@ -969,7 +977,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			} else {
 				JSON thread = seg.getObject("thread");
 				r += thread.getString("number") + " " + thread.getString("title") + "\n";
-				resultForm.append(new ImageItem(null, transportImg(thread.getString("transport_type")), Item.LAYOUT_LEFT | Item.LAYOUT_NEWLINE_BEFORE, null));
+				ImageItem img = new ImageItem(null, transportImg(thread.getString("transport_type")), Item.LAYOUT_LEFT | Item.LAYOUT_NEWLINE_BEFORE, null);
+				resultForm.append(img);
 			}
 			r += (oneDay(cal, departure) ? time(departure) : shortDate(departure) + " " + time(departure));
 			r += " - " + (oneDay(cal, arrival) ? time(arrival) : shortDate(arrival) + " " + time(arrival)) + "\n";
@@ -977,7 +986,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			s.addCommand(itemCmd);
 			s.setDefaultCommand(itemCmd);
 			s.setItemCommandListener(midlet);
-			s.setLayout(Item.LAYOUT_LEFT | Item.LAYOUT_NEWLINE_AFTER);
+			s.setLayout(Item.LAYOUT_LEFT | (s60v3 ? Item.LAYOUT_NEWLINE_BEFORE : Item.LAYOUT_NEWLINE_AFTER));
 			items.put(s, new Integer(i));
 			resultForm.append(s);
 		}
