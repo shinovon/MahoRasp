@@ -30,7 +30,7 @@ public class JSON extends InputStream {
 
 	// JSONObject
 	
-	protected Hashtable table;
+	Hashtable table;
 
 	public JSON(Hashtable table) {
 		this.table = table == null ? new Hashtable() : table;
@@ -248,14 +248,14 @@ public class JSON extends InputStream {
 			Enumeration keys = table.keys();
 			while (true) {
 				String k = (String) keys.nextElement();
-				s.append("\"").append(k).append("\":");
+				s.append('"').append(k).append("\":");
 				Object v = table.get(k);
 				if (v instanceof JSON) {
 					s.append(((JSON) v).build());
 				} else if (v instanceof JSON) {
 					s.append(((JSON) v).build());
 				} else if (v instanceof String) {
-					s.append("\"").append(MahoRaspApp2.escape_utf8((String) v)).append("\"");
+					s.append('"').append(escape_utf8((String) v)).append('"');
 				} else if (v == MahoRaspApp2.json_null) {
 					s.append((String) null);
 				} else {
@@ -281,7 +281,7 @@ public class JSON extends InputStream {
 			} else if (v instanceof JSON) {
 				s.append(((JSON) v).build());
 			} else if (v instanceof String) {
-				s.append("\"").append(MahoRaspApp2.escape_utf8((String) v)).append("\"");
+				s.append('"').append(escape_utf8((String) v)).append('"');
 			} else if (v == MahoRaspApp2.json_null) {
 				s.append((String) null);
 			} else {
@@ -289,10 +289,10 @@ public class JSON extends InputStream {
 			}
 			i++;
 			if (i < size) {
-				s.append(",");
+				s.append(',');
 			}
 		}
-		s.append("]");
+		s.append(']');
 		return s.toString();
 	}
 
@@ -309,36 +309,91 @@ public class JSON extends InputStream {
 		return array;
 	}
 	
-	void _put(String name, Object obj) {
-		table.put(name, obj);
-	}
-	
-	// FilterStream
+	// FilterStream buffered
 	
 	private InputStream in;
+	private byte[] buf;
+	private int pos;
 	
 	JSON(InputStream stream) {
 		in = stream;
+		buf = new byte[2048];
 	}
 
 	public int read() throws IOException {
-		return in.read();
+//		return in.read();
+		if (pos >= count && fillbuf() == -1) return -1;
+		if (count - pos > 0) return buf[pos++] & 0xFF;
+		return -1;
 	}
 
 	public int read(byte[] b) throws IOException {
-		return in.read(b);
+//		return in.read(b);
+		return read(b, 0, b.length);
 	}
 
-	public int read(byte[] b, int offset, int length) throws IOException {
-		return in.read(b, offset, length);
+	public int read(byte[] buffer, int offset, int length) throws IOException {
+//		return in.read(b, offset, length);
+		if (length == 0) return 0;
+		int required;
+		if (pos < count) {
+			int copylength = count - pos >= length ? length : count - pos;
+			System.arraycopy(buf, pos, buffer, offset, copylength);
+			pos += copylength;
+			if (copylength == length || in.available() == 0)
+				return copylength;
+			offset += copylength;
+			required = length - copylength;
+		} else required = length;
+
+		while (true) {
+			int read;
+			if (required >= buf.length) {
+				read = in.read(buffer, offset, required);
+				if (read == -1)
+					return required == length ? -1 : length - required;
+			} else {
+				if (fillbuf() == -1)
+					return required == length ? -1 : length - required;
+				read = count - pos >= required ? required : count - pos;
+				System.arraycopy(buf, pos, buffer, offset, read);
+				pos += read;
+			}
+			required -= read;
+			if (required == 0) return length;
+			if (in.available() == 0) return length - required;
+			offset += read;
+		}
 	}
 
 	public long skip(long n) throws IOException {
-		return in.skip(n);
+//		return in.skip(n);
+		if (n < 1) return 0;
+
+		if (count - pos >= n) {
+			pos += n;
+			return n;
+		}
+		long read = count - pos;
+		pos = count;
+		return read + in.skip(n - read);
 	}
 
 	public int available() throws IOException {
-		return in.available();
+//		return in.available();
+		return count - pos + in.available();
+	}
+	
+	public void close() {
+//		in.close();
+		buf = null;
+	}
+	
+	private int fillbuf() throws IOException {
+		int r = in.read(buf);
+		pos = 0;
+		count = r == -1 ? 0 : r;
+		return r;
 	}
 	
 	// JSONArray
@@ -620,24 +675,6 @@ public class JSON extends InputStream {
 			System.arraycopy(elements, index + 1, elements, index, size);
 		elements[count] = null;
 	}
-
-	public Enumeration elements() {
-		return new Enumeration() {
-			int i = 0;
-			
-			public boolean hasMoreElements() {
-				return i < count;
-			}
-			
-			public Object nextElement() {
-				Object o = elements[i];
-				if (o instanceof String[])
-					o = elements[i] = MahoRaspApp2.parseJSON(((String[]) o)[0]);
-				i++;
-				return o == MahoRaspApp2.json_null ? null : o;
-			}
-		};
-	}
 	
 	public void copyInto(Object[] arr) {
 		copyInto(arr, 0, arr.length);
@@ -681,6 +718,50 @@ public class JSON extends InputStream {
 		Object[] tmp = new Object[elements.length * 2];
 		System.arraycopy(elements, 0, tmp, 0, count);
 		elements = tmp;
+	}
+
+	// transforms string for exporting
+	private static String escape_utf8(String s) {
+		int len = s.length();
+		StringBuffer sb = new StringBuffer();
+		int i = 0;
+		while (i < len) {
+			char c = s.charAt(i);
+			switch (c) {
+			case '"':
+			case '\\':
+				sb.append("\\").append(c);
+				break;
+			case '\b':
+				sb.append("\\b");
+				break;
+			case '\f':
+				sb.append("\\f");
+				break;
+			case '\n':
+				sb.append("\\n");
+				break;
+			case '\r':
+				sb.append("\\r");
+				break;
+			case '\t':
+				sb.append("\\t");
+				break;
+			default:
+				if (c < 32 || c > 1103) {
+					String u = Integer.toHexString(c);
+					sb.append("\\u");
+					for (int z = u.length(); z < 4; z++) {
+						sb.append('0');
+					}
+					sb.append(u);
+				} else {
+					sb.append(c);
+				}
+			}
+			i++;
+		}
+		return sb.toString();
 	}
 
 }

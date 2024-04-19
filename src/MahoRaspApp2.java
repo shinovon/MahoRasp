@@ -1581,7 +1581,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 					value = parse_members || (c != '{' && c != '[') ?
 							parseJSON((String) value) : new String[] {(String) value};
 					if (object) {
-						((JSON) res)._put(key, value);
+						((JSON) res).table.put(key, value);
 						key = null;
 						nextDelimiter = ':';
 					} else if (splIndex > i) {
@@ -1617,50 +1617,6 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			}
 			throw new RuntimeException("JSON: Couldn't be parsed: " + str);
 		}
-	}
-
-	// transforms string for exporting
-	static String escape_utf8(String s) {
-		int len = s.length();
-		StringBuffer sb = new StringBuffer();
-		int i = 0;
-		while (i < len) {
-			char c = s.charAt(i);
-			switch (c) {
-			case '"':
-			case '\\':
-				sb.append("\\").append(c);
-				break;
-			case '\b':
-				sb.append("\\b");
-				break;
-			case '\f':
-				sb.append("\\f");
-				break;
-			case '\n':
-				sb.append("\\n");
-				break;
-			case '\r':
-				sb.append("\\r");
-				break;
-			case '\t':
-				sb.append("\\t");
-				break;
-			default:
-				if (c < 32 || c > 1103) {
-					String u = Integer.toHexString(c);
-					sb.append("\\u");
-					for (int z = u.length(); z < 4; z++) {
-						sb.append('0');
-					}
-					sb.append(u);
-				} else {
-					sb.append(c);
-				}
-			}
-			i++;
-		}
-		return sb.toString();
 	}
 
 	static int getInt(Object o) {
