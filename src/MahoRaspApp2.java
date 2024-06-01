@@ -4,6 +4,7 @@ Copyright (c) 2023-2024 Arman Jussupgaliyev
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.Reader;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Enumeration;
@@ -148,7 +149,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static Object searchLock = new Object();
 	private static boolean searching;
 	
-	private static InputStreamReader searchReader;
+	private static Reader searchReader;
 	private static boolean searchCancel;
 	
 	private static JSON bookmarks;
@@ -788,7 +789,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				} catch (Exception e) {}
 			}
 			searching = true;
-			InputStreamReader r = null;
+			Reader r = null;
 			s: {
 				try {
 					String query = searchField.getString().toLowerCase().trim();
@@ -1054,23 +1055,23 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		searchIds.removeAllElements();
 	}
 	
-	InputStreamReader openCitiesStream() throws IOException {
+	Reader openCitiesStream() throws IOException {
 		if(stream != null) {
 			try {
 				// попытка ресетнуть поток
 				stream.reset();
-				return new InputStreamReader(new JSON(stream), "UTF-8");
+				return new BufferedReader(new InputStreamReader(new JSON(stream), "UTF-8"));
 			} catch (Exception e) {
 				// не получилось, переоткрываем
 				try {
 					stream.close();
 				} catch (IOException e2) {}
 				stream = getClass().getResourceAsStream("/cities");
-				return new InputStreamReader(new JSON(stream), "UTF-8");
+				return new BufferedReader(new InputStreamReader(new JSON(stream), "UTF-8"));
 			}
 		}
 		stream = getClass().getResourceAsStream("/cities");
-		return new InputStreamReader(new JSON(stream), "UTF-8");
+		return new BufferedReader(new InputStreamReader(new JSON(stream), "UTF-8"));
 	}
 	
 	private static void runGPS() {
