@@ -793,10 +793,16 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			s: {
 				try {
 					String query = searchField.getString().toLowerCase().trim();
+					
+					// варианты для поиска по словам
+					String q1 = " ".concat(query);
+//					String q2 = "(".concat(query);
+					String q3 = "-".concat(query);
+					
 					searchChoice.deleteAll();
 					searchIds.removeAllElements();
 					searchChoice.setLabel("Поиск...");
-					Vector items = new Vector();
+					Vector tmpItems = new Vector();
 					search: {
 						if(query.length() < 3) break search;
 						r = searchReader = openCitiesStream();
@@ -821,11 +827,12 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 									sb.append(c);
 								}
 								String cityName = sb.toString();
-								if(cityName.toLowerCase().startsWith(query)) {
+								String t = cityName.toLowerCase();
+								if(t.startsWith(query) || t.indexOf(q1) != -1 || t.indexOf(q3) != -1) {
 									searchChoice.append(cityName + ", " + regionName, null);
 									searchIds.addElement(code);
-								} else if(regionName.toLowerCase().startsWith(query)) {
-									items.addElement(new String[] {cityName, regionName, code});
+								} else if((t = regionName.toLowerCase()).startsWith(query) || t.indexOf(q1) != -1 || t.indexOf(q3) != -1) {
+									tmpItems.addElement(new String[] {cityName, regionName, code});
 								}
 								if(searchReader.read() != ',') {
 									break;
@@ -838,7 +845,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 					}
 					if(searchForm == null || searchCancel) break s;
 					searchChoice.setLabel("");
-					for(Enumeration e = items.elements(); e.hasMoreElements(); ) {
+					for(Enumeration e = tmpItems.elements(); e.hasMoreElements(); ) {
 						if(searchChoice.size() > 10) break;
 						String[] s = (String[]) e.nextElement();
 						searchChoice.append(s[0] + ", " + s[1], null);
