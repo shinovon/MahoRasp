@@ -261,7 +261,6 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		}
 		if(c == choosePointCmd) { // начать выбор точки
 			choosing = i == fromBtn ? 1 : 2;
-			// TODO выбор станции
 			searchForm = new Form("Выбор точки");
 			searchDoneCmdAdded = true;
 			searchField = new TextField("Поиск", "", 100, TextField.ANY);
@@ -847,9 +846,13 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 					String query = searchField.getString();
 					Vector tmpItems = null;
 					
+					searchChoice.deleteAll();
+					searchIds.removeAllElements();
+					searchChoice.setLabel("Поиск...");
+					
 					if (netSearch) {
-						// поиск в сети
-						JSON j = getObject(getUtf(SUGGESTURL + "?field=" + (choosing == 1 ? "from" : "to") + "&lang=ru&limit=15&part=" + url(query)).trim());
+						// поиск в сети, мб парам part вместо query?
+						JSON j = getObject(getUtf(SUGGESTURL + "?field=" + (choosing == 1 ? "from" : "to") + "&lang=ru&limit=15&query=" + url(query)).trim());
 						if (j.has("error")) {
 							throw new Exception(j.getObject("error").getString("text"));
 						}
@@ -859,11 +862,9 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 						int l = j.size();
 						for (int i = 0; i < l; i++) {
 							JSON s = j.getObject(i);
-							String t = s.getString("full_title");
-							String c = s.getString("point_key");
 
-							searchChoice.append(t, null);
-							searchIds.addElement(c);
+							searchChoice.append(s.getString("full_title"), null);
+							searchIds.addElement(s.getString("point_key"));
 						}
 					} else {
 						// локальный поиск
@@ -873,10 +874,6 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 						String q1 = " ".concat(query);
 	//					String q2 = "(".concat(query);
 						String q3 = "-".concat(query);
-						
-						searchChoice.deleteAll();
-						searchIds.removeAllElements();
-						searchChoice.setLabel("Поиск...");
 						tmpItems = new Vector();
 						search: {
 							if(query.length() < 3) break search;
