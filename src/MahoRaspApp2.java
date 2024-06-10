@@ -375,7 +375,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 //			proxyChoice = new ChoiceGroup(null, Choice.MULTIPLE, new String[] { "Проксировать запросы" }, null);
 //			proxyChoice.setSelectedIndex(0, proxy);
 //			settingsForm.append(proxyChoice);
-			setsChoice = new ChoiceGroup(null, Choice.MULTIPLE, new String[] { "Подсказки поиска из сети" }, null);
+			setsChoice = new ChoiceGroup(null, Choice.MULTIPLE, new String[] { "Онлайн подсказки" }, null);
 			setsChoice.setSelectedIndex(0, netSearch);
 			settingsForm.append(setsChoice);
 			display(settingsForm);
