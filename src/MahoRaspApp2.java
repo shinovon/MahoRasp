@@ -81,6 +81,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static final int RUN_UPDATE_RESULT = 5;
 	private static final int RUN_NEAREST_CITY = 6;
 	private static final int RUN_LOCATION = 7;
+	private static final int RUN_SEARCH_TIMER = 8;
 	
 	private static final int BOOKMARK_CITIES = 1;
 //	private static final int BOOKMARK_STATIONS = 2;
@@ -152,6 +153,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static InputStream stream;
 	private static Object searchLock = new Object();
 	private static boolean searching;
+	private static int searchTimer;
+	private static Thread searchThread;
 	
 	private static Reader searchReader;
 	private static boolean searchCancel;
@@ -628,7 +631,17 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	public void itemStateChanged(Item item) {
 		if(item == searchField) { // выполнять поиск при изменениях в поле ввода
 			if(running) return;
-			start(RUN_SEARCH);
+			if (searchThread == null) {
+				try {
+					synchronized(this) {
+						run = RUN_SEARCH_TIMER;
+						(searchThread = new Thread(this)).start();
+						wait();
+						run = 0;
+					}
+				} catch (Exception e) {}
+				searchTimer = 5;
+			}
 		}
 		if(item == searchChoice) {
 			if(searchChoice.getSelectedIndex() != -1) {
@@ -650,7 +663,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			run = this.run;
 			notify();
 		}
-		running = run != RUN_SEARCH && run != RUN_LOCATION;
+		running = run != RUN_SEARCH && run != RUN_LOCATION && run != RUN_SEARCH_TIMER;
 		switch(run) {
 		case RUN_REQUEST: { // запрос
 			items.clear();
@@ -836,17 +849,18 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 					
 					if (netSearch) {
 						// поиск в сети
-						JSON j = getObject(getUtf(SUGGESTURL + "?field=" + (choosing == 1 ? "from" : "to") + "&lang=ru&limit=15&part=" + url(query)));
+						JSON j = getObject(getUtf(SUGGESTURL + "?field=" + (choosing == 1 ? "from" : "to") + "&lang=ru&limit=15&part=" + url(query)).trim());
 						if (j.has("error")) {
 							throw new Exception(j.getObject("error").getString("text"));
 						}
 						
-						j = j.getArray("suggets");
+						j = j.getArray("suggests");
 						
 						int l = j.size();
 						for (int i = 0; i < l; i++) {
-							String t = j.getString("full_title");
-							String c = j.getString("point_key");
+							JSON s = j.getObject(i);
+							String t = s.getString("full_title");
+							String c = s.getString("point_key");
 
 							searchChoice.append(t, null);
 							searchIds.addElement(c);
@@ -994,6 +1008,16 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				runGPS();
 			} catch (Throwable e) {}
 			gpsDone();
+			return;
+		}
+		case RUN_SEARCH_TIMER: {
+			try {
+				while (true) {
+					if (searchTimer > 0 && --searchTimer == 0) start(RUN_SEARCH);
+					Thread.sleep(100);
+				}
+			} catch (Exception ignored) {}
+			searchThread = null;
 			return;
 		}
 		}
