@@ -62,7 +62,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	// команды формы выбора
 	private static final Command doneCmd = new Command("Готово", Command.OK, 1);
 	private static final Command cancelCmd = new Command("Отмена", Command.CANCEL, 1);
-	private static final Command gpsCmd = new Command("Ближайший город", Command.ITEM, 2);
+	private static final Command gpsCmd = new Command("Ближайший город", Command.SCREEN, 2);
+	private static final Command gpsStationsCmd = new Command("Ближайшие станции", Command.SCREEN, 3);
 //	private static final Command searchCmd = new Command("Поиск", Command.ITEM, 2);
 
 	// закладки
@@ -85,8 +86,10 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 //	private static final int BOOKMARK_STATIONS = 2;
 //	private static final int BOOKMARK_SEGMENT = 3;
 	
-	// апи ключ
+	// константы апи
 	private static final String APIKEY = "20e7cb3e-6b05-4774-bcbb-4b0fb74a58b0";
+	private static final String APIURL = "http://api.rasp.yandex.net/v3.0/";
+	private static final String SUGGESTURL = "http://suggests.rasp.yandex.net/all_suggests";
 
 	private static final String[] TRANSPORT_TYPES = new String[] {
 		"plane", "train", "suburban", "bus", "water", "helicopter"
@@ -118,6 +121,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static TextField timezoneField;
 	private static ChoiceGroup timezoneChoice;
 //	private ChoiceGroup proxyChoice;
+	private static ChoiceGroup setsChoice;
 	
 	private static Form resultForm;
 
@@ -142,7 +146,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static TextField searchField;
 	private static ChoiceGroup searchChoice;
 
-	private static int choosing;
+	private static int choosing; // 1 - from, 2 - to
 	private static Vector searchIds = new Vector();
 	private static boolean searchDoneCmdAdded;
 	private static InputStream stream;
@@ -165,6 +169,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 	private static String timezone;
 	private static int timezoneMode;
 //	private static boolean proxy;
+	private static boolean netSearch = true;
 	
 	private static boolean s60v3;
 
@@ -239,6 +244,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			timezone = j.getString("tz", timezone);
 			timezoneMode = j.getInt("tzm", timezoneMode);
 //			proxy = j.getBoolean("proxy", proxy);
+			netSearch = j.getBoolean("ns", netSearch);
 		} catch (Exception e) {}
 		display(mainForm);
 	}
@@ -253,21 +259,32 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		if(c == choosePointCmd) { // начать выбор точки
 			choosing = i == fromBtn ? 1 : 2;
 			// TODO выбор станции
-			searchForm = new Form("Выбор города");
+			searchForm = new Form("Выбор точки");
 			searchDoneCmdAdded = true;
 			searchField = new TextField("Поиск", "", 100, TextField.ANY);
 			searchField.setItemCommandListener(this);
 			searchForm.append(searchField);
-			StringItem gpsBtn = new StringItem(null, "Ближайший город", Item.BUTTON);
-			gpsBtn.setLayout(Item.LAYOUT_EXPAND | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_NEWLINE_BEFORE);
-			gpsBtn.addCommand(gpsCmd);
-			gpsBtn.setDefaultCommand(gpsCmd);
-			gpsBtn.setItemCommandListener(this);
-			searchForm.append(gpsBtn);
+			
+//			StringItem gpsBtn = new StringItem(null, "Ближайший город", Item.BUTTON);
+//			gpsBtn.setLayout(Item.LAYOUT_EXPAND | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_NEWLINE_BEFORE);
+//			gpsBtn.addCommand(gpsCmd);
+//			gpsBtn.setDefaultCommand(gpsCmd);
+//			gpsBtn.setItemCommandListener(this);
+//			searchForm.append(gpsBtn);
+//			
+//			gpsBtn = new StringItem(null, "Ближайшие станции", Item.BUTTON);
+//			gpsBtn.setLayout(Item.LAYOUT_EXPAND | Item.LAYOUT_NEWLINE_AFTER | Item.LAYOUT_NEWLINE_BEFORE);
+//			gpsBtn.addCommand(gpsStationsCmd);
+//			gpsBtn.setDefaultCommand(gpsStationsCmd);
+//			gpsBtn.setItemCommandListener(this);
+//			searchForm.append(gpsBtn);
+			
 			searchChoice = new ChoiceGroup("", Choice.EXCLUSIVE);
 			searchChoice.setFitPolicy(Choice.TEXT_WRAP_ON);
 			searchForm.append(searchChoice);
 			searchForm.addCommand(cancelCmd);
+			searchForm.addCommand(gpsCmd);
+//			searchForm.addCommand(gpsStationsCmd);
 			searchForm.setCommandListener(this);
 			searchForm.setItemStateListener(this);
 			display(searchForm);
@@ -301,6 +318,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 				timezone = timezoneField.getString();
 				timezoneMode = timezoneChoice.getSelectedIndex();
 //				proxy = proxyChoice.isSelected(0);
+				netSearch = setsChoice.isSelected(0);
 				try {
 					RecordStore.deleteRecordStore(SETTINGS_RECORDNAME);
 				} catch (Exception e) {
@@ -310,6 +328,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 					j.put("tz", timezone);
 					j.put("tzm", timezoneMode);
 //					j.put("proxy", proxy);
+					j.put("ns", netSearch);
 					byte[] b = j.toString().getBytes("UTF-8");
 					RecordStore r = RecordStore.openRecordStore(SETTINGS_RECORDNAME, true);
 					r.addRecord(b, 0, b.length);
@@ -354,6 +373,9 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 //			proxyChoice = new ChoiceGroup(null, Choice.MULTIPLE, new String[] { "Проксировать запросы" }, null);
 //			proxyChoice.setSelectedIndex(0, proxy);
 //			settingsForm.append(proxyChoice);
+			setsChoice = new ChoiceGroup(null, Choice.MULTIPLE, new String[] { "Подсказки поиска из сети" }, null);
+			setsChoice.setSelectedIndex(0, netSearch);
+			settingsForm.append(setsChoice);
 			display(settingsForm);
 			return;
 		}
@@ -372,6 +394,23 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			} catch (Throwable e) {
 				display(warningAlert(e.toString()), searchForm);
 			}
+			return;
+		}
+		if(c == gpsStationsCmd) { // показать ближайшие станции TODO
+//			if(gpsActive) return;
+//			gpsActive = true;
+//			gpsDialog = new Alert("", "Ожидание геолокации", null, null);
+//			gpsDialog.setTimeout(Alert.FOREVER);
+//			gpsDialog.setIndicator(new Gauge(null, false, Gauge.INDEFINITE, Gauge.CONTINUOUS_RUNNING));
+//			gpsDialog.addCommand(cancelCmd);
+//			gpsDialog.setCommandListener(this);
+//			display(gpsDialog, searchForm);
+//			try {
+//				Class.forName("javax.microedition.location.LocationProvider");
+//				start(RUN_LOCATION);
+//			} catch (Throwable e) {
+//				display(warningAlert(e.toString()), searchForm);
+//			}
 			return;
 		}
 		if(c == cancelCmd) {
@@ -792,65 +831,89 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 			Reader r = null;
 			s: {
 				try {
-					String query = searchField.getString().toLowerCase().trim();
+					String query = searchField.getString();
+					Vector tmpItems = null;
 					
-					// варианты для поиска по словам
-					String q1 = " ".concat(query);
-//					String q2 = "(".concat(query);
-					String q3 = "-".concat(query);
-					
-					searchChoice.deleteAll();
-					searchIds.removeAllElements();
-					searchChoice.setLabel("Поиск...");
-					Vector tmpItems = new Vector();
-					search: {
-						if(query.length() < 3) break search;
-						r = searchReader = openCitiesStream();
-						if(searchReader.read() != 'm' || searchReader.read() != '[')
-							throw new Exception("Cities database is corrupted");
-						StringBuffer sb;
-						char c;
-						while(!searchCancel) {
-							sb = new StringBuffer();
-							while((c = (char) searchReader.read()) != '"') {
-								sb.append(c);
-							}
-							String regionName = sb.toString();
-							for(;;) {
+					if (netSearch) {
+						// поиск в сети
+						JSON j = getObject(getUtf(SUGGESTURL + "?field=" + (choosing == 1 ? "from" : "to") + "&lang=ru&limit=15&part=" + url(query)));
+						if (j.has("error")) {
+							throw new Exception(j.getObject("error").getString("text"));
+						}
+						
+						j = j.getArray("suggets");
+						
+						int l = j.size();
+						for (int i = 0; i < l; i++) {
+							String t = j.getString("full_title");
+							String c = j.getString("point_key");
+
+							searchChoice.append(t, null);
+							searchIds.addElement(c);
+						}
+					} else {
+						// локальный поиск
+						
+						query = query.toLowerCase().trim();
+						// варианты для поиска по словам
+						String q1 = " ".concat(query);
+	//					String q2 = "(".concat(query);
+						String q3 = "-".concat(query);
+						
+						searchChoice.deleteAll();
+						searchIds.removeAllElements();
+						searchChoice.setLabel("Поиск...");
+						tmpItems = new Vector();
+						search: {
+							if(query.length() < 3) break search;
+							r = searchReader = openCitiesStream();
+							if(searchReader.read() != 'm' || searchReader.read() != '[')
+								throw new Exception("Cities database is corrupted");
+							StringBuffer sb;
+							char c;
+							while(!searchCancel) {
 								sb = new StringBuffer();
 								while((c = (char) searchReader.read()) != '"') {
 									sb.append(c);
 								}
-								String code = sb.toString();
-								sb = new StringBuffer();
-								while((c = (char) searchReader.read()) != '"') {
-									sb.append(c);
-								}
-								String cityName = sb.toString();
-								String t = cityName.toLowerCase();
-								if(t.startsWith(query) || t.indexOf(q1) != -1 || t.indexOf(q3) != -1) {
-									searchChoice.append(cityName + ", " + regionName, null);
-									searchIds.addElement(code);
-								} else if((t = regionName.toLowerCase()).startsWith(query) || t.indexOf(q1) != -1 || t.indexOf(q3) != -1) {
-									tmpItems.addElement(new String[] {cityName, regionName, code});
+								String regionName = sb.toString();
+								for(;;) {
+									sb = new StringBuffer();
+									while((c = (char) searchReader.read()) != '"') {
+										sb.append(c);
+									}
+									String code = sb.toString();
+									sb = new StringBuffer();
+									while((c = (char) searchReader.read()) != '"') {
+										sb.append(c);
+									}
+									String cityName = sb.toString();
+									String t = cityName.toLowerCase();
+									if(t.startsWith(query) || t.indexOf(q1) != -1 || t.indexOf(q3) != -1) {
+										searchChoice.append(cityName + ", " + regionName, null);
+										searchIds.addElement(code);
+									} else if((t = regionName.toLowerCase()).startsWith(query) || t.indexOf(q1) != -1 || t.indexOf(q3) != -1) {
+										tmpItems.addElement(new String[] {cityName, regionName, code});
+									}
+									if(searchReader.read() != ',') {
+										break;
+									}
 								}
 								if(searchReader.read() != ',') {
 									break;
 								}
 							}
-							if(searchReader.read() != ',') {
-								break;
-							}
 						}
 					}
 					if(searchForm == null || searchCancel) break s;
 					searchChoice.setLabel("");
-					for(Enumeration e = tmpItems.elements(); e.hasMoreElements(); ) {
-						if(searchChoice.size() > 10) break;
-						String[] s = (String[]) e.nextElement();
-						searchChoice.append(s[0] + ", " + s[1], null);
-						searchIds.addElement(s[2]);
-					}
+					if (tmpItems != null) // добавить элементы из вторичного поиска
+						for(Enumeration e = tmpItems.elements(); e.hasMoreElements(); ) {
+							if(searchChoice.size() > 15) break;
+							String[] s = (String[]) e.nextElement();
+							searchChoice.append(s[0] + ", " + s[1], null);
+							searchIds.addElement(s[2]);
+						}
 					// замена функции "отмена" на "готово"
 					if(searchChoice.getSelectedIndex() != -1) {
 						if(!searchDoneCmdAdded) break s;
@@ -1411,7 +1474,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 //		url = "http://api.rasp.yandex.net/v3.0/" + url + (!url.endsWith("?") ? "&" : "") + "apikey=" + APIKEY + "&format=json&lang=ru_RU";
 //		if (proxy)
 //			url = "http://nnp.nnchan.ru:80/hproxy.php?u=" + url(url);
-		String r = getUtf("http://api.rasp.yandex.net/v3.0/" + url + (!url.endsWith("?") ? "&" : "") + "apikey=" + APIKEY + "&format=json&lang=ru_RU");
+		String r = getUtf(APIURL + url + (!url.endsWith("?") ? "&" : "") + "apikey=" + APIKEY + "&format=json&lang=ru_RU");
 		JSON j = getObject(r);
 		if(j.has("error")) {
 			// выбрасывать эксепшн с текстом ошибки
