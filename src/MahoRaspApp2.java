@@ -640,8 +640,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 						run = 0;
 					}
 				} catch (Exception e) {}
-				searchTimer = 5;
 			}
+			searchTimer = 5;
 		}
 		if(item == searchChoice) {
 			if(searchChoice.getSelectedIndex() != -1) {
