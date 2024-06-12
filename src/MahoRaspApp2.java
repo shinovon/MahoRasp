@@ -225,7 +225,7 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		try {
 			s60v3 = System.getProperty("com.symbian.midp.serversocket.support") != null ||
 					System.getProperty("com.symbian.default.to.suite.icon") != null
-					|| System.getProperty("microedition.platform").indexOf("platform_version=5.") == -1;
+					|| System.getProperty("microedition.platform").indexOf("platform_version=3.") != -1;
 		} catch (Exception e) {}
 		try {
 			// загрузка иконок
