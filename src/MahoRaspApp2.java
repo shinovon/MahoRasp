@@ -725,8 +725,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 								d = "Терминал: " + m + "\n";
 							}
 							String dep, arr;
-							Calendar departure = getLocalizedDate(dep = seg.getString("departure"));
-							Calendar arrival = getLocalizedDate(arr = seg.getString("arrival"));
+							Calendar departure = getLocalizedDate(dep = n.getString("departure"));
+							Calendar arrival = getLocalizedDate(arr = n.getString("arrival"));
 							boolean tzDiffer = parseTimeZone(dep) != parseTimeZone(arr) && timezoneMode == 0;
 							StringItem s = new StringItem(null,
 									"Отправление: " + point(n.getObject("from")) + "\n" +
@@ -1224,7 +1224,8 @@ public class MahoRaspApp2 extends MIDlet implements CommandListener, ItemCommand
 		Alert a = new Alert("");
 		a.setString(text);
 		a.setIndicator(new Gauge(null, false, Gauge.INDEFINITE, Gauge.CONTINUOUS_RUNNING));
-		a.setTimeout(30000);
+		a.setTimeout(Alert.FOREVER);
+		a.setCommandListener(midlet);
 		return a;
 	}
 	
